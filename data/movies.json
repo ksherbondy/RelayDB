@@ -1,0 +1,22 @@
+[
+  {"#id":"apollo_13","^":"movies","name":"Apollo 13","release_year":1995,"@cast":["kevin_bacon","tom_hanks"],"@director":"ron_howard","~genres":"Drama"},
+  {"#id":"the_grinch","^":"movies","name":"How the Grinch Stole Christmas","release_year":2000,"@cast":["jim_carrey"],"@director":"ron_howard","~genres":"Comedy"},
+  {"#id":"cast_away","^":"movies","name":"Cast Away","release_year":2000,"@cast":["tom_hanks"],"@director":"robert_zemeckis","~genres":"Adventure"},
+  {"#id":"forrest_gump","^":"movies","name":"Forrest Gump","release_year":1994,"@cast":["tom_hanks"],"@director":"robert_zemeckis","~genres":"Drama"},
+  {"#id":"tremors","^":"movies","name":"Tremors","release_year":1990,"@cast":["kevin_bacon"],"@director":"ron_underwood","~genres":"Horror"},
+  {"#id":"mystic_river","^":"movies","name":"Mystic River","release_year":2003,"@cast":["kevin_bacon","sean_penn"],"@director":"clint_eastwood","~genres":"Crime"},
+  {"#id":"the_terminal","^":"movies","name":"The Terminal","release_year":2004,"@cast":["tom_hanks"],"@director":"steven_spielberg","~genres":"Comedy"},
+  {"#id":"saving_private_ryan","^":"movies","name":"Saving Private Ryan","release_year":1998,"@cast":["tom_hanks","matt_damon"],"@director":"steven_spielberg","~genres":"War"},
+  {"#id":"interstellar","^":"movies","name":"Interstellar","release_year":2014,"@cast":["matthew_mcconaughey"],"@director":"christopher_nolan","~genres":"Sci-Fi"},
+  {"#id":"inception","^":"movies","name":"Inception","release_year":2010,"@cast":["leonardo_dicaprio"],"@director":"christopher_nolan","~genres":"Sci-Fi"},
+  {"#id":"pulp_fiction","^":"movies","name":"Pulp Fiction","release_year":1994,"@cast":["samuel_l_jackson","john_travolta"],"@director":"quentin_tarantino","~genres":"Crime"},
+  {"#id":"django_unchained","^":"movies","name":"Django Unchained","release_year":2012,"@cast":["jamie_foxx","leonardo_dicaprio"],"@director":"quentin_tarantino","~genres":"Western"},
+  {"#id":"the_shining","^":"movies","name":"The Shining","release_year":1980,"@cast":["jack_nicholson"],"@director":"stanley_kubrick","~genres":"Horror"},
+  {"#id":"jaws","^":"movies","name":"Jaws","release_year":1975,"@cast":["roy_scheider"],"@director":"steven_spielberg","~genres":"Thriller"},
+  {"#id":"the_thing","^":"movies","name":"The Thing","release_year":1982,"@cast":["kurt_russell"],"@director":"john_carpenter","~genres":"Horror"},
+  {"#id":"big","^":"movies","name":"Big","release_year":1988,"@cast":["tom_hanks"],"@director":"penny_marshall","~genres":"Fantasy"},
+  {"#id":"footloose","^":"movies","name":"Footloose","release_year":1984,"@cast":["kevin_bacon"],"@director":"herbert_ross","~genres":"Drama"},
+  {"#id":"toy_story","^":"movies","name":"Toy Story","release_year":1995,"@cast":["tom_hanks","tim_allen"],"@director":"john_lasseter","~genres":"Animation"},
+  {"#id":"the_martian","^":"movies","name":"The Martian","release_year":2015,"@cast":["matt_damon"],"@director":"ridley_scott","~genres":"Sci-Fi"},
+  {"#id":"gladiator","^":"movies","name":"Gladiator","release_year":2000,"@cast":["russell_crowe"],"@director":"ridley_scott","~genres":"Action"}
+]
