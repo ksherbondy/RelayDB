@@ -1,10 +1,10 @@
 use clap::{Parser, Subcommand};
-use std::collections::HashSet;
-// We only need relay_jump and verify_integrity now
 use relay_compiler::{relay_jump, verify_integrity};
+use std::collections::HashSet;
 
 #[derive(Parser)]
 #[command(name = "relay")]
+#[command(version = "1.1")]
 #[command(about = "The RelayDB 4-Tag Protocol CLI", long_about = None)]
 struct Cli {
     #[command(subcommand)]
@@ -15,9 +15,9 @@ struct Cli {
 enum Commands {
     /// Navigate the graph starting at a specific Anchor (#)
     Jump {
-        /// The Anchor ID to start from (e.g., tom_hanks)
+        /// The Anchor ID to start from (e.g., #the_terminal)
         anchor: String,
-        /// Optional metadata filter (e.g., Drama)
+        /// Optional metadata filter (e.g., ~Drama)
         #[arg(short, long)]
         filter: Option<String>,
     },
@@ -30,15 +30,29 @@ fn main() {
 
     match &cli.command {
         Commands::Jump { anchor, filter } => {
+            println!("--- RELAY-JUMP: Teleporting to #{} ---", anchor);
             let mut visited = HashSet::new();
+
+            // The library handles the recursive teleportation logic.
             relay_jump(anchor, &mut visited, filter.as_deref());
+
+            println!(
+                "\n--- Traversal Complete: {} nodes mapped ---",
+                visited.len()
+            );
         }
         Commands::Check => {
-            println!("--- Running Integrity Check ---");
+            println!("--- RELAY-CHECK: Auditing Binary Solder Points ---");
+
+            // Delegate the scan to the library policy.
             if verify_integrity() {
-                println!("RESULT: All soldered addresses are physically sound. 🚀");
+                // Success path
+                println!("SUCCESS: System is physically sound and ready for transport. 🚀");
+                std::process::exit(0);
             } else {
-                println!("RESULT: Integrity failures detected. Re-bake required.");
+                // Failure path
+                eprintln!("CRITICAL: Data corruption or address mismatch detected.");
+                std::process::exit(1);
             }
         }
     }
