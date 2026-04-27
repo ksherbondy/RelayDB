@@ -1,22 +1,142 @@
 [
-  {"#id":"kevin_bacon","^":"actors","name":"Kevin Bacon","bio":"Center of the universe.","~genres":["Drama","Horror"]},
-  {"#id":"tom_hanks","^":"actors","name":"Tom Hanks","bio":"America's Dad.","~genres":["Drama","Comedy"]},
-  {"#id":"jim_carrey","^":"actors","name":"Jim Carrey","bio":"Physical comedy legend.","~genres":"Comedy"},
-  {"#id":"matt_damon","^":"actors","name":"Matt Damon","bio":"Founding member of the Bourne identity.","~genres":["Action","Drama"]},
-  {"#id":"leonardo_dicaprio","^":"actors","name":"Leonardo DiCaprio","bio":"Finally won an Oscar.","~genres":"Drama"},
-  {"#id":"samuel_l_jackson","^":"actors","name":"Samuel L. Jackson","bio":"The busiest man in Hollywood.","~genres":"Action"},
-  {"#id":"jack_nicholson","^":"actors","name":"Jack Nicholson","bio":"Here's Johnny!","~genres":"Horror"},
-  {"#id":"kurt_russell","^":"actors","name":"Kurt Russell","bio":"Legendary action star.","~genres":"Sci-Fi"},
-  {"#id":"matthew_mcconaughey","^":"actors","name":"Matthew McConaughey","bio":"Alright, alright, alright.","~genres":"Sci-Fi"},
-  {"#id":"tim_allen","^":"actors","name":"Tim Allen","bio":"To infinity and beyond.","~genres":"Animation"},
-  {"#id":"russell_crowe","^":"actors","name":"Russell Crowe","bio":"Are you not entertained?","~genres":"Action"},
-  {"#id":"jamie_foxx","^":"actors","name":"Jamie Foxx","bio":"Multitalented star.","~genres":"Western"},
-  {"#id":"john_travolta","^":"actors","name":"John Travolta","bio":"Dance floor king.","~genres":"Crime"},
-  {"#id":"roy_scheider","^":"actors","name":"Roy Scheider","bio":"Needs a bigger boat.","~genres":"Thriller"},
-  {"#id":"sean_penn","^":"actors","name":"Sean Penn","bio":"Intense character actor.","~genres":"Crime"},
-  {"#id":"meryl_streep","^":"actors","name":"Meryl Streep","bio":"The GOAT.","~genres":"Drama"},
-  {"#id":"brad_pitt","^":"actors","name":"Brad Pitt","bio":"First rule of Fight Club...","~genres":"Action"},
-  {"#id":"denzel_washington","^":"actors","name":"Denzel Washington","bio":"King Kong ain't got nothing on him.","~genres":"Drama"},
-  {"#id":"jodie_foster","^":"actors","name":"Jodie Foster","bio":"Silence of the lambs legend.","~genres":"Thriller"},
-  {"#id":"will_smith","^":"actors","name":"Will Smith","bio":"The Fresh Prince.","~genres":"Action"}
+  {
+    "#id":"kevin_bacon",
+    "^":"actors",
+    "name":"Kevin Bacon",
+    "bio":"Center of the universe.",
+    "~genres":["Drama","Horror"]
+  },
+  {
+    "#id":"tom_hanks",
+    "^":"actors",
+    "name":"Tom Hanks",
+    "bio":"America's Dad.",
+    "~genres":["Drama","Comedy"]
+  },
+  {
+    "#id":"jim_carrey",
+    "^":"actors",
+    "name":"Jim Carrey",
+    "bio":"Physical comedy legend.",
+    "~genres":"Comedy"
+  },
+  {
+    "#id":"matt_damon",
+    "^":"actors",
+    "name":"Matt Damon",
+    "bio":"Founding member of the Bourne identity.",
+    "~genres":["Action","Drama"]
+  },
+  {
+    "#id":"leonardo_dicaprio",
+    "^":"actors",
+    "name":"Leonardo DiCaprio",
+    "bio":"Finally won an Oscar.",
+    "~genres":"Drama"
+  },
+  {
+    "#id":"samuel_l_jackson",
+    "^":"actors",
+    "name":"Samuel L. Jackson",
+    "bio":"The busiest man in Hollywood.",
+    "~genres":"Action"
+  },
+  {
+    "#id":"jack_nicholson",
+    "^":"actors",
+    "name":"Jack Nicholson",
+    "bio":"Here's Johnny!",
+    "~genres":"Horror"
+  },
+  {
+    "#id":"kurt_russell",
+    "^":"actors",
+    "name":"Kurt Russell",
+    "bio":"Legendary action star.",
+    "~genres":"Sci-Fi"
+  },
+  {
+    "#id":"matthew_mcconaughey",
+    "^":"actors",
+    "name":"Matthew McConaughey",
+    "bio":"Alright, alright, alright.",
+    "~genres":"Sci-Fi"
+  },
+  {
+    "#id":"tim_allen",
+    "^":"actors",
+    "name":"Tim Allen",
+    "bio":"To infinity and beyond.",
+    "~genres":"Animation"
+  },
+  {
+    "#id":"russell_crowe",
+    "^":"actors",
+    "name":"Russell Crowe",
+    "bio":"Are you not entertained?",
+    "~genres":"Action"
+  },
+  {
+    "#id":"jamie_foxx",
+    "^":"actors",
+    "name":"Jamie Foxx",
+    "bio":"Multitalented star.",
+    "~genres":"Western"
+  },
+  {
+    "#id":"john_travolta",
+    "^":"actors",
+    "name":"John Travolta",
+    "bio":"Dance floor king.",
+    "~genres":"Crime"
+  },
+  {
+    "#id":"roy_scheider",
+    "^":"actors",
+    "name":"Roy Scheider",
+    "bio":"Needs a bigger boat.",
+    "~genres":"Thriller"
+  },
+  {
+    "#id":"sean_penn",
+    "^":"actors",
+    "name":"Sean Penn",
+    "bio":"Intense character actor.",
+    "~genres":"Crime"
+  },
+  {
+    "#id":"meryl_streep",
+    "^":"actors",
+    "name":"Meryl Streep",
+    "bio":"The GOAT.",
+    "~genres":"Drama"
+  },
+  {
+    "#id":"brad_pitt",
+    "^":"actors",
+    "name":"Brad Pitt",
+    "bio":"First rule of Fight Club...",
+    "~genres":"Action"
+  },
+  {
+    "#id":"denzel_washington",
+    "^":"actors",
+    "name":"Denzel Washington",
+    "bio":"King Kong ain't got nothing on him.",
+    "~genres":"Drama"
+  },
+  {
+    "#id":"jodie_foster",
+    "^":"actors",
+    "name":"Jodie Foster",
+    "bio":"Silence of the lambs legend.",
+    "~genres":"Thriller"
+  },
+  {
+    "#id":"will_smith",
+    "^":"actors",
+    "name":"Will Smith",
+    "bio":"The Fresh Prince.",
+    "~genres":"Action"
+  }
 ]

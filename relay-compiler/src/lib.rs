@@ -152,7 +152,10 @@ pub fn relay_jump(target_id: &str, visited: &mut HashSet<String>, subject: Optio
 fn should_display_entry(data: &Value, subject: Option<&str>) -> bool {
     if let Some(s) = subject {
         let raw_string = serde_json::to_string(data).unwrap_or_default();
-        return raw_string.contains(s) || data["^"] == "movies";
+
+        // Changing || to && ensures that even if it's a movie,
+        // it still MUST contain the subject string.
+        return raw_string.contains(s) && data["^"] == "movies";
     }
     true
 }

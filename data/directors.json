@@ -1,22 +1,141 @@
 [
-  {"#id":"ron_howard","^":"directors","name":"Ron Howard","bio":"From Opie to Oscar winner.","~style":"Classical"},
-  {"#id":"steven_spielberg","^":"directors","name":"Steven Spielberg","bio":"The blockbuster king.","~style":"Grand"},
-  {"#id":"robert_zemeckis","^":"directors","name":"Robert Zemeckis","bio":"Master of tech in film.","~style":"Innovative"},
-  {"#id":"christopher_nolan","^":"directors","name":"Christopher Nolan","bio":"Obsessed with time.","~style":"Complex"},
-  {"#id":"quentin_tarantino","^":"directors","name":"Quentin Tarantino","bio":"Dialogue and feet.","~style":"Gritty"},
-  {"#id":"stanley_kubrick","^":"directors","name":"Stanley Kubrick","bio":"The perfectionist.","~style":"Symmetric"},
-  {"#id":"john_carpenter","^":"directors","name":"John Carpenter","bio":"The Master of Horror.","~style":"Suspense"},
-  {"#id":"ridley_scott","^":"directors","name":"Ridley Scott","bio":"Visual world builder.","~style":"Atmospheric"},
-  {"#id":"clint_eastwood","^":"directors","name":"Clint Eastwood","bio":"Efficient storyteller.","~style":"Minimalist"},
-  {"#id":"martin_scorsese","^":"directors","name":"Martin Scorsese","bio":"Cinema's historian.","~style":"Dynamic"},
-  {"#id":"greta_gerwig","^":"directors","name":"Greta Gerwig","bio":"Modern voice.","~style":"Vibrant"},
-  {"#id":"denis_villeneuve","^":"directors","name":"Denis Villeneuve","bio":"Visual poet.","~style":"Vast"},
-  {"#id":"wes_anderson","^":"directors","name":"Wes Anderson","bio":"Pastel symmetry.","~style":"Whimsical"},
-  {"#id":"david_fincher","^":"directors","name":"David Fincher","bio":"Dark perfection.","~style":"Clinical"},
-  {"#id":"james_cameron","^":"directors","name":"James Cameron","bio":"The king of the world.","~style":"Epic"},
-  {"#id":"alfred_hitchcock","^":"directors","name":"Alfred Hitchcock","bio":"The Master of Suspense.","~style":"Twisty"},
-  {"#id":"kathryn_bigelow","^":"directors","name":"Kathryn Bigelow","bio":"Action intensity.","~style":"Visceral"},
-  {"#id":"spike_lee","^":"directors","name":"Spike Lee","bio":"The provocateur.","~style":"Energetic"},
-  {"#id":"bong_joon_ho","^":"directors","name":"Bong Joon-ho","bio":"Genre bender.","~style":"Social"},
-  {"#id":"jordan_peele","^":"directors","name":"Jordan Peele","bio":"New Horror icon.","~style":"Allegorical"}
+  {
+    "#id":"ron_howard",
+    "^":"directors",
+    "name":"Ron Howard",
+    "bio":"From Opie to Oscar winner.",
+    "~style":"Classical"
+  },
+  {
+    "#id":"steven_spielberg",
+    "^":"directors",
+    "name":"Steven Spielberg",
+    "bio":"The blockbuster king.",
+    "~style":"Grand"
+  },
+  {
+    "#id":"robert_zemeckis",
+    "^":"directors",
+    "name":"Robert Zemeckis",
+    "bio":"Master of tech in film.",
+    "~style":"Innovative"
+  },
+  {
+    "#id":"christopher_nolan",
+    "^":"directors",
+    "name":"Christopher Nolan",
+    "bio":"Obsessed with time.",
+    "~style":"Complex"
+  },
+  {
+    "#id":"quentin_tarantino",
+    "^":"directors",
+    "name":"Quentin Tarantino",
+    "bio":"Dialogue and feet.",
+    "~style":"Gritty"
+  },
+  {
+    "#id":"stanley_kubrick",
+    "^":"directors",
+    "name":"Stanley Kubrick",
+    "bio":"The perfectionist.",
+    "~style":"Symmetric"
+  },
+  {
+    "#id":"john_carpenter",
+    "^":"directors",
+    "name":"John Carpenter",
+    "bio":"The Master of Horror.",
+    "~style":"Suspense"
+  },
+  {
+    "#id":"ridley_scott",
+    "^":"directors",
+    "name":"Ridley Scott",
+    "bio":"Visual world builder.",
+    "~style":"Atmospheric"
+  },
+  {
+    "#id":"clint_eastwood",
+    "^":"directors",
+    "name":"Clint Eastwood",
+    "bio":"Efficient storyteller.",
+    "~style":"Minimalist"
+  },
+  {
+    "#id":"martin_scorsese",
+    "^":"directors",
+    "name":"Martin Scorsese",
+    "bio":"Cinema's historian.",
+    "~style":"Dynamic"
+  },
+  {
+    "#id":"greta_gerwig",
+    "^":"directors",
+    "name":"Greta Gerwig",
+    "bio":"Modern voice.",
+    "~style":"Vibrant"
+  },
+  {
+    "#id":"denis_villeneuve",
+    "^":"directors",
+    "name":"Denis Villeneuve",
+    "bio":"Visual poet.",
+    "~style":"Vast"
+  },
+  {
+    "#id":"wes_anderson",
+    "^":"directors",
+    "name":"Wes Anderson",
+    "bio":"Pastel symmetry.",
+    "~style":"Whimsical"
+  },
+  {
+    "#id":"david_fincher",
+    "^":"directors",
+    "name":"David Fincher",
+    "bio":"Dark perfection.",
+    "~style":"Clinical"
+  },
+  {
+    "#id":"james_cameron",
+    "^":"directors",
+    "name":"James Cameron",
+    "bio":"The king of the world.",
+    "~style":"Epic"
+  },
+  {
+    "#id":"alfred_hitchcock",
+    "^":"directors",
+    "name":"Alfred Hitchcock",
+    "bio":"The Master of Suspense.",
+    "~style":"Twisty"
+  },
+  {
+    "#id":"kathryn_bigelow",
+    "^":"directors",
+    "name":"Kathryn Bigelow",
+    "bio":"Action intensity.",
+    "~style":"Visceral"
+  },
+  {
+    "#id":"spike_lee",
+    "^":"directors",
+    "name":"Spike Lee",
+    "bio":"The provocateur.",
+    "~style":"Energetic"
+  },
+  {
+    "#id":"bong_joon_ho",
+    "^":"directors",
+    "name":"Bong Joon-ho",
+    "bio":"Genre bender.",
+    "~style":"Social"
+  },
+  {
+    "#id":"jordan_peele",
+    "^":"directors",
+    "name":"Jordan Peele",
+    "bio":"New Horror icon.",
+    "~style":"Allegorical"}
 ]
