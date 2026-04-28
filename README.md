@@ -1,10 +1,15 @@
-<p align="left">
-  <img src="RelayDB-Logo.png" width="400" />
-</p>
-
-# RelayDB
-**The Bacon Standard**  
-*A compiled read layer for static relational knowledge.*
+<table>
+  <tr>
+    <td width="260" valign="top">
+      <img src="RelayDB-Logo.png" width="220" alt="RelayDB logo" />
+    </td>
+    <td valign="middle">
+      <h1>RelayDB</h1>
+      <p><strong>The Bacon Standard</strong><br/>
+      <em>A compiled read layer for static relational knowledge.</em></p>
+    </td>
+  </tr>
+</table>
 
 RelayDB is a Rust-based compiler-and-runtime system for **static, relational, read-heavy data**.
 
@@ -19,22 +24,156 @@ RelayDB is **not** a database replacement. It is a **compiled read layer** for d
 
 ---
 
-## Why RelayDB exists
+## Before you start
 
-RelayDB grew out of a real frontend problem: too many JSON files, too much manual wiring, and too much repetitive mapping just to display related static content on a page.
+### Prerequisites
 
-If the data is:
+You need these installed **before** running RelayDB:
 
-- static
-- relational
-- known ahead of time
-- and read-heavy in production
+- **Rust + Cargo**
+- **make**
+- **Graphviz** (`dot`) for graph rendering
 
-then RelayDB asks a simple question:
+### Important directory note
 
-**Why pay runtime database overhead to rediscover structure that could have been compiled once?**
+Run all `make` commands from the **top-level `RelayDB/` directory**, not from `relay-compiler/`.
 
-That is the problem RelayDB is built to solve.
+- `RelayDB/` = repo root
+- `relay-compiler/` = Rust subproject
+- `data/` = source JSON files
+- `Makefile` = lives at the top level and orchestrates the workflow
+
+### Minimal repo map
+
+```text
+RelayDB/
+├── Makefile
+├── README.md
+├── data/
+│   ├── actors.json
+│   ├── directors.json
+│   └── movies.json
+├── relay-compiler/
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── lib.rs
+│   │   └── bin/
+│   │       ├── compiler.rs
+│   │       ├── reader.rs
+│   │       ├── relay.rs
+│   │       └── verify.rs
+│   └── builds/
+└── RelayDB_v2_Final_Project_Specification.md
+```
+
+If you are on Linux or Windows, you may need to adjust any `open` commands used by the current `Makefile`.
+
+---
+
+## Quick start
+
+### 1. From the top-level `RelayDB/` directory
+
+```bash
+make all
+```
+
+This runs the full pipeline:
+
+1. tests
+2. build
+3. verification
+
+Generated artifacts are written under:
+
+```text
+relay-compiler/builds/
+```
+
+### 2. Individual commands
+
+From the top-level `RelayDB/` directory:
+
+#### Run tests
+
+```bash
+make test
+```
+
+#### Build the `.relay` artifact and reports
+
+```bash
+make build
+```
+
+#### Verify the baked binary
+
+```bash
+make verify
+```
+
+#### Open the latest markdown audit report
+
+```bash
+make audit
+```
+
+#### Generate and open the graph PNG
+
+```bash
+make graph
+```
+
+#### Clean build products
+
+```bash
+make clean
+```
+
+#### Show available commands
+
+```bash
+make help
+```
+
+---
+
+## Direct Cargo usage
+
+If you want to run the Rust tools manually, switch into the Rust subproject first:
+
+```bash
+cd relay-compiler
+```
+
+Then use Cargo commands like:
+
+### Compile / bake
+
+```bash
+cargo run --bin compiler --quiet
+```
+
+### Run tests
+
+```bash
+cargo test --quiet
+```
+
+### Verify the artifact
+
+```bash
+cargo run --bin relay -- check
+```
+
+### Jump to an anchor
+
+```bash
+cargo run --bin relay -- jump the_terminal -f Drama
+```
+
+> Current CLI commands are `jump` and `check`.  
+> The longer-term v2 direction expands this into a more formal command surface.
 
 ---
 
@@ -52,7 +191,7 @@ RelayDB is optimized for:
 
 - static knowledge bundles
 - documentation engines
-- localization/i18n data
+- localization / i18n data
 - product or content catalogs
 - reference sites
 - frontend applications that need structured related data without backend complexity
@@ -75,6 +214,25 @@ It is **not**:
 
 The source files are the authored truth.  
 The `.relay` file is the **compiled truth**.
+
+---
+
+## Why RelayDB exists
+
+RelayDB grew out of a real frontend problem: too many JSON files, too much manual wiring, and too much repetitive mapping just to display related static content on a page.
+
+If the data is:
+
+- static
+- relational
+- known ahead of time
+- and read-heavy in production
+
+then RelayDB asks a simple question:
+
+**Why pay runtime database overhead to rediscover structure that could have been compiled once?**
+
+That is the problem RelayDB is built to solve.
 
 ---
 
@@ -136,98 +294,15 @@ RelayDB currently follows this pattern:
 2. Run tests and validation
 3. Compile source into `bacon_standard.relay`
 4. Verify the artifact
-5. Use the CLI or service layer to retrieve/traverse data
+5. Use the CLI or service layer to retrieve / traverse data
 
 At runtime, Relay reads from the compiled `.relay` artifact itself.
 
 ---
 
-## Project layout
-
-This README assumes the current repository layout where the Rust project lives under `relay-compiler/` and the top-level `Makefile` orchestrates the full workflow.
-
----
-
-## Requirements
-
-- Rust / Cargo
-- `make`
-- Graphviz (`dot`) for graph rendering
-- macOS `open` command is currently used by the provided `Makefile` targets for `audit` and `graph`
-
-If you are on Linux or Windows, you may need to adjust those `open` commands.
-
----
-
-## Quick start
-
-### 1. Run the full pipeline
-
-```bash
-make all
-```
-
-This runs:
-
-1. tests
-2. build
-3. verification
-
-and leaves the generated artifacts in:
-
-```text
-relay-compiler/builds/
-```
-
-### 2. Run steps individually
-
-#### Run tests
-
-```bash
-make test
-```
-
-#### Build the `.relay` artifact and reports
-
-```bash
-make build
-```
-
-#### Verify the baked binary
-
-```bash
-make verify
-```
-
-#### Open the latest markdown audit report
-
-```bash
-make audit
-```
-
-#### Generate and open the graph PNG
-
-```bash
-make graph
-```
-
-#### Clean all build products
-
-```bash
-make clean
-```
-
-#### Show available commands
-
-```bash
-make help
-```
-
----
-
 ## What the Makefile does
 
-The current `Makefile` provides a professional orchestration layer:
+The top-level `Makefile` provides the main developer workflow:
 
 - `make all` → full pipeline: **Test → Build → Verify**
 - `make test` → run Rust unit tests
@@ -236,43 +311,6 @@ The current `Makefile` provides a professional orchestration layer:
 - `make audit` → open the latest markdown audit report
 - `make graph` → convert the latest `.dot` file into a PNG and open it
 - `make clean` → wipe generated artifacts and Rust build outputs
-
----
-
-## Direct Cargo usage
-
-If you want to run the tools manually without `make`, the current commands are:
-
-### Compile / bake
-
-```bash
-cd relay-compiler
-cargo run --bin compiler --quiet
-```
-
-### Run tests
-
-```bash
-cd relay-compiler
-cargo test --quiet
-```
-
-### Verify the artifact
-
-```bash
-cd relay-compiler
-cargo run --bin relay -- check
-```
-
-### Jump to an anchor
-
-```bash
-cd relay-compiler
-cargo run --bin relay -- jump the_terminal -f Drama
-```
-
-> The current CLI uses `jump` and `check`.  
-> The longer-term v2 direction expands this into a more formal command surface.
 
 ---
 
@@ -310,7 +348,7 @@ RelayDB deliberately lets databases do database things, while Relay handles stab
 
 RelayDB already shows value in a few key areas:
 
-- reducing repetitive frontend/backend glue code
+- reducing repetitive frontend / backend glue code
 - centralizing relationship traversal logic
 - turning scattered JSON into a coherent compiled artifact
 - generating explainability artifacts during build
@@ -371,10 +409,10 @@ RelayDB is still evolving, but contributions are welcome from developers interes
 - language bindings
 - visualization tools
 - benchmark harnesses
-- schema/lint tooling
+- schema / lint tooling
 - frontend integration examples
 - WASM exploration
-- CI/CD automation
+- CI / CD automation
 
 Good contribution targets include:
 
