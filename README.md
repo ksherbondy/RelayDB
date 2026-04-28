@@ -1,100 +1,401 @@
-# 🛰️ RelayDB: The Bacon Standard
-**A High-Performance, Binary-Solder Data Engine**
+<p align="left">
+  <img src="RelayDB-Logo.png" width="400" />
+</p>
 
-RelayDB is a proof-of-concept database architecture designed to turn JSON files into a light read-only database using a **4-Tag Protocol** that enables $O(1)$ jump-speed relationships. By utilizing a 4-Tag Protocol, it enables O(1) relationship "teleportation" without the overhead of a traditional database engine.
+# RelayDB
+**The Bacon Standard**  
+*A compiled read layer for static relational knowledge.*
 
-### Why "Read-Only" is a Feature for Developers
+RelayDB is a Rust-based compiler-and-runtime system for **static, relational, read-heavy data**.
 
-In modern high-concurrency environments, ***Immutable Integrity*** solves the "Race Condition" problem. If the data cannot be changed after it is baked, you never have to worry about two different users trying to write to the same record at the same time.
+It is designed for situations where data is already known at build time and does **not** need the full overhead of a live-query database in production. Instead of repeatedly importing, mapping, and manually stitching together scattered JSON files at runtime, RelayDB lets you:
 
-## 🚀 Current v1.0 Features
-- Modular Library: The core physics (jumps, fetches, and recursion) is decoupled into a standalone Rust crate for easy integration.
+- author related data with a simple **4-tag model**
+- validate structure and topology at build time
+- compile that data into a portable, read-only `.relay` artifact
+- retrieve and traverse it through explicit anchors and relationships
 
-- Unified CLI: A professional entry point for baking, jumping, and verifying data.
+RelayDB is **not** a database replacement. It is a **compiled read layer** for data that is effectively finished before deployment.
 
-- Integrity Inspector: A physical verifier that cross-references the Jump Table against the binary to ensure zero corruption.
+---
 
-- Recursive Relay: Automatic "Baton" following to traverse complex data graphs instantly.
+## Why RelayDB exists
 
-***Potential Use Cases for RelayDB***:
+RelayDB grew out of a real frontend problem: too many JSON files, too much manual wiring, and too much repetitive mapping just to display related static content on a page.
 
-- Static Asset Metadata: Powering high-speed lookups for large image libraries or CDN assets where the paths are set during a build step.
+If the data is:
 
-- Configuration Management: Storing complex, nested environment configurations that need to be accessed at O(1) speeds across thousands of server instances.
+- static
+- relational
+- known ahead of time
+- and read-heavy in production
 
-- Localization (i18n): Serving translated strings for massive web applications where low-latency delivery is critical.
+then RelayDB asks a simple question:
 
-- Documentation Engines: Building the backend for "Living Documentation" systems where the technical specs are baked directly from the source code.
+**Why pay runtime database overhead to rediscover structure that could have been compiled once?**
 
-## 🛠️ The 4-Tag Protocol
-| Symbol | Role | Technical Reality |
-| :--- | :--- | :--- |
-| `#` | **The Anchor** | A unique ID that maps to a permanent physical memory address. |
-| `^` | **The Topic** | A memory segment allowing the engine to categorize the data block. |
-| `@` | **The Baton** | A physical pointer that the engine follows instantly to a new address. |
-| `~` | **The Relation** | A metadata filter used to group or discard baton passes. |
+That is the problem RelayDB is built to solve.
 
-### 4-Tag Protocol in Action:
-```JSON
+---
+
+## What RelayDB is
+
+RelayDB is:
+
+- a **source authoring model**
+- a **compiler / verifier pipeline**
+- a **portable `.relay` binary artifact**
+- a **read-only runtime retrieval engine**
+- a **toolchain for audit, graphing, and validation**
+
+RelayDB is optimized for:
+
+- static knowledge bundles
+- documentation engines
+- localization/i18n data
+- product or content catalogs
+- reference sites
+- frontend applications that need structured related data without backend complexity
+- RAG prefiltering / structural context assembly
+
+---
+
+## What RelayDB is not
+
+RelayDB is intentionally narrow in scope.
+
+It is **not**:
+
+- a transactional database
+- a live write system
+- a system of record
+- a query planner
+- a CRUD backend
+- a full-text search engine
+
+The source files are the authored truth.  
+The `.relay` file is the **compiled truth**.
+
+---
+
+## The 4-Tag Model
+
+Relay source data uses four reserved prefixes:
+
+| Prefix | Name | Purpose |
+|---|---|---|
+| `#` | Anchor | Unique, stable node identity |
+| `^` | Topic | Primary classification / type |
+| `@` | Baton | Traversable relationship edges |
+| `~` | Metadata | Non-traversed descriptive/filterable fields |
+
+### Example
+
+```json
 [
-{
-    "#id":"gladiator",
-    "^":"movies",
-    "name":"Gladiator",
-    "release_year":2000,
-    "@cast":["russell_crowe"],
-    "@director":"ridley_scott",
-    "~genres":"Action"
-    }
+  {
+    "#id": "gladiator",
+    "^": "movies",
+    "name": "Gladiator",
+    "release_year": 2000,
+    "@cast": ["russell_crowe"],
+    "@director": "ridley_scott",
+    "~genres": "Action"
+  }
 ]
 ```
 
-## 🚀 Why RelayDB?
-- **Zero-Scan Architecture**: We don't "search" for data; we teleport to it using pre-calculated byte offsets.
-- **Normalization First**: Relationships are "soldered" into the binary, preventing data duplication and "rubbish" bloat.
-- **Metal Mindset**: Built in Rust to prioritize speed, low latency, and memory safety.
+### Meaning
 
-## 📖 Usage
-1. **Bake**: Place JSON files in `/data` and run `cargo run --bin compiler` to solder the binary.
-2. **Relay**: Use `cargo run --bin reader` to navigate the graph at $O(1)$ speeds. (Legacy command see Step 3 instead)
-3. ***Jump***: Use the unified CLI to navigate the graph: `cargo run --bin relay -- jump the_terminal -f Drama`
-4. ***Verify***: Run the inspector to check the health of the .relay file: `cargo run --bin relay -- check`
+- `#id` gives the node a stable identity.
+- `^` tells Relay what kind of node it is.
+- `@cast` and `@director` define graph relationships.
+- `~genres` provides metadata that can be filtered or inspected but is not traversed as an edge.
 
+---
 
-1. Updated README.md Additions
+## Current project shape
 
-Add these sections after your Usage instructions to invite collaboration.
+The current RelayDB codebase already includes:
 
-🛠️ How to Contribute
+- a **compiler** that ingests JSON and bakes a `.relay` artifact
+- a **library crate** that handles retrieval and traversal logic
+- a **CLI** for jumping and verifying
+- a **verifier** for integrity checks
+- generated **audit** and **graph** artifacts during build
 
-We are looking for "Metal-Minded" developers to help move RelayDB from a PoC to a production-ready toolchain. Current priorities:
+The current implementation is the working foundation for the RelayDB v2 direction.
 
-- The Relay-API: Building a Rust-based microservice to serve Relay lookups to React/Frontend applications via lightning-fast binary streaming.
+---
 
-- Incremental Soldering: Developing a "patch" system to append data to the .relay file without requiring a full re-bake.
+## Current workflow
 
-- Visualization Tools: Creating a tool to map the "Baton Passes" into a visual graph for debugging complex relationships.
+RelayDB currently follows this pattern:
 
-- Edge Case Handling: Implementing the "visited" logic as a standard to prevent circular relay loops.
+1. Author related JSON source files
+2. Run tests and validation
+3. Compile source into `bacon_standard.relay`
+4. Verify the artifact
+5. Use the CLI or service layer to retrieve/traverse data
 
-- WASM Porting: Compiling the Reader to WebAssembly to allow these O(1) jumps to happen directly in the user's browser.
+At runtime, Relay reads from the compiled `.relay` artifact itself.
 
-- CLI Tooling: Developing a unified relay-cli to handle baking, reading, and verifying .relay files with intuitive terminal commands.
+---
 
-- CI/CD Pipeline: Implementing GitHub Actions to automatically run the compiler and verify binary integrity on every pull request.
+## Project layout
 
-- Comprehensive Testing: Building a "Gold Standard" test suite that verifies O(1) jump accuracy, null-termination boundaries, and recursive relay limits.
+This README assumes the current repository layout where the Rust project lives under `relay-compiler/` and the top-level `Makefile` orchestrates the full workflow.
 
-- Verification Utilities: Tools to "checksum" a .relay file to ensure the soldered addresses match the source JSON.
+---
 
-🧠 Behind the Logic: The O(1) Reality
+## Requirements
 
-In RelayDB, we don't "query" the file. We perform Memory Teleportation:
+- Rust / Cargo
+- `make`
+- Graphviz (`dot`) for graph rendering
+- macOS `open` command is currently used by the provided `Makefile` targets for `audit` and `graph`
 
-- The Header (Bytes 0-16): Validates the protocol.
+If you are on Linux or Windows, you may need to adjust those `open` commands.
 
-- The Jump Table: A (Key: Address) map appended to the file end. Because the Jump Table's size varies, the Header (Bytes 8-16) contains a 64-bit pointer telling the Reader exactly where the Table starts at the end of the file.
+---
 
-- The Seek: Utilizing Rust's std::io::Seek, we move the disk head (or SSD pointer) directly to the byte offset.
+## Quick start
 
-- The Result: Total time complexity is O(1)—the speed is identical for 10 entries or 10 million.
+### 1. Run the full pipeline
+
+```bash
+make all
+```
+
+This runs:
+
+1. tests
+2. build
+3. verification
+
+and leaves the generated artifacts in:
+
+```text
+relay-compiler/builds/
+```
+
+### 2. Run steps individually
+
+#### Run tests
+
+```bash
+make test
+```
+
+#### Build the `.relay` artifact and reports
+
+```bash
+make build
+```
+
+#### Verify the baked binary
+
+```bash
+make verify
+```
+
+#### Open the latest markdown audit report
+
+```bash
+make audit
+```
+
+#### Generate and open the graph PNG
+
+```bash
+make graph
+```
+
+#### Clean all build products
+
+```bash
+make clean
+```
+
+#### Show available commands
+
+```bash
+make help
+```
+
+---
+
+## What the Makefile does
+
+The current `Makefile` provides a professional orchestration layer:
+
+- `make all` → full pipeline: **Test → Build → Verify**
+- `make test` → run Rust unit tests
+- `make build` → compile the `.relay` file and generate `.md` / `.dot` artifacts
+- `make verify` → perform integrity checks on the baked artifact
+- `make audit` → open the latest markdown audit report
+- `make graph` → convert the latest `.dot` file into a PNG and open it
+- `make clean` → wipe generated artifacts and Rust build outputs
+
+---
+
+## Direct Cargo usage
+
+If you want to run the tools manually without `make`, the current commands are:
+
+### Compile / bake
+
+```bash
+cd relay-compiler
+cargo run --bin compiler --quiet
+```
+
+### Run tests
+
+```bash
+cd relay-compiler
+cargo test --quiet
+```
+
+### Verify the artifact
+
+```bash
+cd relay-compiler
+cargo run --bin relay -- check
+```
+
+### Jump to an anchor
+
+```bash
+cd relay-compiler
+cargo run --bin relay -- jump the_terminal -f Drama
+```
+
+> The current CLI uses `jump` and `check`.  
+> The longer-term v2 direction expands this into a more formal command surface.
+
+---
+
+## Current implementation notes
+
+The current working implementation:
+
+- compiles source JSON into a single `.relay` artifact
+- records byte offsets for compiled nodes
+- resolves anchors through an index
+- retrieves node payloads from the compiled file
+- follows `@` batons recursively
+- verifies index-to-payload integrity
+
+This means runtime retrieval is based on the compiled artifact, not on reopening the original source JSON files.
+
+---
+
+## Why read-only is a feature
+
+Read-only is not a limitation in RelayDB. It is part of the design.
+
+Because the data is compiled ahead of time:
+
+- there are no runtime writes to coordinate
+- there are no race conditions on production data
+- there is no mutable database state to protect
+- there is a cleaner trust boundary between build time and runtime
+
+RelayDB deliberately lets databases do database things, while Relay handles stable relational data that can be validated and baked before shipping.
+
+---
+
+## Current strengths
+
+RelayDB already shows value in a few key areas:
+
+- reducing repetitive frontend/backend glue code
+- centralizing relationship traversal logic
+- turning scattered JSON into a coherent compiled artifact
+- generating explainability artifacts during build
+- making static relational data easier to consume from apps and services
+
+A React bootstrap prototype was able to consume Relay with very little code, which is exactly the kind of developer experience Relay is intended to improve.
+
+---
+
+## RelayDB v2 direction
+
+The project now has a formal **RelayDB v2.0 Master Specification**.
+
+The v2 direction centers on:
+
+- stronger build-time certainty
+- collision-safe binary indexing
+- length-prefixed node storage
+- structured result packets instead of terminal-only output
+- tiered integrity verification
+- benchmark-driven performance claims
+- topic-neutral core behavior
+
+The high-level philosophy is:
+
+> If data is static, relational, and known at build time, correctness and structure should be enforced before shipping, not rediscovered repeatedly at runtime.
+
+---
+
+## Immediate next deliverables
+
+The next major artifacts for the project are:
+
+1. **Binary Appendix**
+   - exact code-adjacent header / index / node structs
+
+2. **Diagnostics Appendix**
+   - compiler and verifier output schema
+
+3. **Structured Result Packet Schema**
+   - canonical API / JSON response shape
+
+4. **v2 Prototype Reader / Writer**
+   - smallest compliant v2 artifact builder and reader
+
+5. **Benchmark Harness**
+   - RelayDB v1.1 vs RelayDB v2 vs JSON scan vs SQLite
+
+---
+
+## Contributing
+
+RelayDB is still evolving, but contributions are welcome from developers interested in:
+
+- compiler diagnostics
+- verification tooling
+- service wrappers
+- language bindings
+- visualization tools
+- benchmark harnesses
+- schema/lint tooling
+- frontend integration examples
+- WASM exploration
+- CI/CD automation
+
+Good contribution targets include:
+
+- cleaner structured API output
+- generalized graph generation
+- hardening error handling
+- replacing prototype-grade shell integrations with proper service layers
+- benchmarking and profiling the runtime
+
+---
+
+## Development philosophy
+
+RelayDB should stay:
+
+- narrow in scope
+- strong in guarantees
+- easy to explain
+- useful to frontend and app developers
+- evidence-driven in performance claims
+
+The goal is not to become everything.
+
+The goal is to become **very good at compiling static relational data into a trusted read artifact**.
