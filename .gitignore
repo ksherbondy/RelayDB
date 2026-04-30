@@ -15,15 +15,20 @@ build/
 
 # OS & Editor
 .DS_Store
+._*
+*.swp
 .vscode/
+.idea/
 
 # Database
 *.sqlite
 *.db
 
-.idea/
-/relay-compiler/target/
+# Rust
+target/
 **/*.rs.bk
 
 # --- RelayDB Binaries ---
 *.relay
+!builds/
+!builds/*.relay

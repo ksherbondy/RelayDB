@@ -1,0 +1,11 @@
+{
+  "name": "@relaydb/relaydb-js",
+  "version": "0.1.0",
+  "description": "JavaScript reader for RelayDB v1 .relay files",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}
