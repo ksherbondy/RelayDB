@@ -44,17 +44,17 @@ console.log(db.get("kevin_bacon"));
 ```js
 const result = db.jump("the_terminal", { filter: "Drama" });
 
-console.log(result.visited.size);
+console.log(result.visited); // number, not result.visited.size
 console.log(result.nodes);
 ```
 
 ## Integrity check
 
 ```js
-const report = db.verifyIntegrity();
+const ok = db.verifyIntegrity();
 
-if (!report.ok) {
-  console.error(report.failures);
+if (!ok) {
+  console.error("Integrity check failed");
 }
 ```
 
