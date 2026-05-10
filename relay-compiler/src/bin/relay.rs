@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use relay_compiler::{relay_jump_from, verify_integrity_from};
+use relay_compiler::{audit_memory_from, relay_jump_from, verify_integrity_from};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -33,6 +33,17 @@ enum Commands {
         /// The .relay file to verify
         #[arg(short, long, default_value = "output.relay")]
         file: PathBuf,
+    },
+
+    /// Audit RelayDB JSON/JSONL source memory before compile
+    AuditMemory {
+        /// Input JSON/JSONL file or directory to audit
+        #[arg(short, long)]
+        input: PathBuf,
+
+        /// Audit mode: validate, summary, duplicates, missing, orphans, external, cycles, all
+        #[arg(short, long, default_value = "all")]
+        mode: String,
     },
 }
 
@@ -68,6 +79,20 @@ fn main() {
                 std::process::exit(0);
             } else {
                 eprintln!("CRITICAL: Data corruption or address mismatch detected.");
+                std::process::exit(1);
+            }
+        }
+
+        Commands::AuditMemory { input, mode } => {
+            println!(
+                "--- RELAY-MEMORY-AUDIT: Auditing {} with mode '{}' ---",
+                input.display(),
+                mode
+            );
+
+            if audit_memory_from(input, mode) {
+                std::process::exit(0);
+            } else {
                 std::process::exit(1);
             }
         }

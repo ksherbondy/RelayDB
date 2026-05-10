@@ -1,70 +1,143 @@
 # ==============================================================================
-# RelayDB: Universal Orchestration Layer
+# RelayDB v1 Engineering Control Panel - Rust-First Version
 # ==============================================================================
-# Indentation MUST be Tabs.
-# Place this file in /RelayDB/Makefile
+# Place this file at the top-level RelayDB/ directory.
 #
-# Expected project layout:
+# Philosophy:
+#   Make orchestrates.
+#   Rust owns RelayDB logic.
 #
-# RelayDB/
-# ├── Makefile
-# ├── relay-compiler/
-# │   ├── Cargo.toml
-# │   ├── src/
-# │   └── builds/
-# └── atlas-memory/
-#     └── relaydb_atlas_tagged_memory.jsonl
-#
-# The new universal compiler supports:
-# - .json files
-# - .jsonl files
-# - custom input path
-# - custom output .relay filename
-# - custom relay file for check/jump commands
+# This Makefile intentionally routes RelayDB validation/audit work through Rust
+# binaries instead of Python scripts. Some audit targets are future-facing and
+# will fail until the corresponding Rust CLI commands are implemented.
 # ==============================================================================
 
-.PHONY: all test build verify jump audit graph clean clean-build clean-cargo demo help
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
 
-# --- [ Configurable Paths ] ----------------------------------------------------
+# --- Configurable Paths --------------------------------------------------------
 
-COMPILER_DIR ?= relay-compiler
-INPUT       ?= atlas-memory/relaydb_atlas_tagged_memory.jsonl
-OUTPUT      ?= $(COMPILER_DIR)/builds/relaydb-docs.relay
-BUILDS      ?= $(COMPILER_DIR)/builds
-ANCHOR      ?= project:relaydb
-FILTER      ?=
+COMPILER_DIR     ?= relay-compiler
+BUILDS           ?= $(COMPILER_DIR)/builds
 
-# --- [ Primary Pipeline ] ------------------------------------------------------
+MEMORY_DIR       ?= atlas-memory
+MEMORY_BASE      ?= $(MEMORY_DIR)/relaydb_v1_self_documentation.jsonl
+MEMORY_PATCHES   ?= $(MEMORY_DIR)/patches
+MEMORY_BRANCHES  ?= $(MEMORY_DIR)/branches
+MEMORY_PLANS     ?= $(MEMORY_DIR)/plans
+MEMORY_COMPILED  ?= $(MEMORY_DIR)/compiled/relaydb_v1_full.jsonl
+
+SELF_DOC_OUTPUT  ?= $(BUILDS)/relaydb-v1-self-docs.relay
+
+INPUT            ?= $(MEMORY_BASE)
+OUTPUT           ?= $(SELF_DOC_OUTPUT)
+ANCHOR           ?= project:relaydb
+FILTER           ?=
+
+VERSION          ?= v1.2.0
+RELEASE_DIR      ?= releases
+RELEASE_NAME     ?= relaydb-$(VERSION)
+
+NODE             ?= node
+OPEN             ?= open
+
+# --- Phony Targets -------------------------------------------------------------
+
+.PHONY: \
+	help \
+	all stable demo \
+	init-dirs \
+	test fmt fmt-check clippy \
+	build self-docs strict verify jump jump-project jump-compiler jump-self-doc \
+	js-smoke \
+	audit graph graph-png size checksum inspect \
+	validate-memory memory-summary duplicates missing orphans external cycles memory-audit \
+	merge-memory patch-next \
+	release package \
+	clean clean-build clean-cargo
+
+# ==============================================================================
+# Primary Pipelines
+# ==============================================================================
 
 all: test build verify
-	@echo "✅ System baked and verified."
+	@echo "✅ RelayDB core pipeline passed."
 	@echo "📦 Relay artifact: $(OUTPUT)"
-	@echo "📁 Audit artifacts: $(BUILDS)"
 
-# 1. Logic Validation
+stable: clean init-dirs test self-docs verify js-smoke memory-audit graph-png checksum
+	@echo ""
+	@echo "✅ RelayDB stable foundation check complete."
+	@echo "📦 Relay artifact: $(OUTPUT)"
+	@echo "🧠 Memory source: $(INPUT)"
+	@echo "📁 Build artifacts: $(BUILDS)"
+
+demo: self-docs verify jump-project js-smoke
+	@echo ""
+	@echo "🎥 Demo pipeline complete: JSONL -> .relay -> verify -> jump -> JS reader"
+
+init-dirs:
+	@mkdir -p $(BUILDS)
+	@mkdir -p $(MEMORY_PATCHES)
+	@mkdir -p $(MEMORY_BRANCHES)
+	@mkdir -p $(MEMORY_PLANS)
+	@mkdir -p $(dir $(MEMORY_COMPILED))
+	@mkdir -p $(RELEASE_DIR)
+	@echo "✅ RelayDB working directories are present."
+
+# ==============================================================================
+# Rust Quality Gates
+# ==============================================================================
+
 test:
-	@echo "--- [1/4] Running Protocol Logic Tests ---"
+	@echo "--- [Rust] Running unit tests ---"
 	@cd $(COMPILER_DIR) && cargo test --quiet
 
-# 2. Binary Synthesis
-build:
-	@echo "--- [2/4] Compiling JSON/JSONL into RelayDB Artifact ---"
-	@mkdir -p $(BUILDS)
+fmt:
+	@echo "--- [Rust] Formatting source ---"
+	@cd $(COMPILER_DIR) && cargo fmt
+
+fmt-check:
+	@echo "--- [Rust] Checking formatting ---"
+	@cd $(COMPILER_DIR) && cargo fmt -- --check
+
+clippy:
+	@echo "--- [Rust] Running Clippy ---"
+	@cd $(COMPILER_DIR) && cargo clippy -- -D warnings
+
+# ==============================================================================
+# Build / Verify / Jump
+# ==============================================================================
+
+build: init-dirs
+	@echo "--- [Build] Compiling JSON/JSONL into RelayDB artifact ---"
+	@echo "Input:  $(INPUT)"
+	@echo "Output: $(OUTPUT)"
 	@cd $(COMPILER_DIR) && cargo run --bin compiler --quiet -- \
 		--input ../$(INPUT) \
 		--output ../$(OUTPUT) \
 		--builds ../$(BUILDS)
 
-# 3. Physical Audit
+self-docs:
+	@$(MAKE) build \
+		INPUT=$(MEMORY_BASE) \
+		OUTPUT=$(SELF_DOC_OUTPUT)
+
+strict: init-dirs
+	@echo "--- [Build] Strict acyclic compile ---"
+	@cd $(COMPILER_DIR) && cargo run --bin compiler --quiet -- \
+		--input ../$(INPUT) \
+		--output ../$(OUTPUT) \
+		--builds ../$(BUILDS) \
+		--strict-acyclic
+
 verify:
-	@echo "--- [3/4] Performing Relay Integrity Check ---"
+	@echo "--- [Verify] Performing physical .relay integrity check ---"
 	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
 		check \
 		--file ../$(OUTPUT)
 
-# 4. Jump / Query Demo
 jump:
-	@echo "--- [4/4] Jumping to Anchor: $(ANCHOR) ---"
+	@echo "--- [Jump] Anchor: $(ANCHOR) ---"
 	@if [ -z "$(FILTER)" ]; then \
 		cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
 			jump \
@@ -78,63 +151,221 @@ jump:
 			--filter "$(FILTER)"; \
 	fi
 
-# Full ATLAS / RelayDB documentation demo pipeline
-demo: all jump
-	@echo "🎥 Demo complete: JSONL -> .relay -> verify -> jump"
+jump-project:
+	@$(MAKE) jump OUTPUT=$(OUTPUT) ANCHOR=project:relaydb
 
-# --- [ Developer Utilities ] ---------------------------------------------------
+jump-compiler:
+	@$(MAKE) jump OUTPUT=$(OUTPUT) ANCHOR=binary:compiler
 
-# Opens the latest generated Markdown audit report.
+jump-self-doc:
+	@$(MAKE) jump OUTPUT=$(OUTPUT) ANCHOR=concept:self-documentation-loop
+
+# ==============================================================================
+# JavaScript Reader Smoke Test
+# ==============================================================================
+
+js-smoke:
+	@echo "--- [JS] Running RelayDB JavaScript reader smoke test ---"
+	@$(NODE) examples/basic-js/test.js $(OUTPUT)
+
+# ==============================================================================
+# Build Artifacts / Visuals / Inspection
+# ==============================================================================
+
 audit:
-	@echo "--- Opening Latest System Audit Report ---"
-	@open $(BUILDS)/$$(ls -t $(BUILDS) | grep '\.md$$' | head -n 1)
+	@echo "--- [Audit] Opening latest Markdown audit artifact ---"
+	@$(OPEN) $(BUILDS)/$$(ls -t $(BUILDS) | grep '\.md$$' | head -n 1)
 
-# Generates and opens the visual graph.
-# Requires Graphviz installed:
-# brew install graphviz
 graph:
-	@echo "--- Generating Visual Topology ---"
+	@echo "--- [Graph] Opening latest DOT artifact ---"
+	@$(OPEN) $(BUILDS)/$$(ls -t $(BUILDS) | grep '\.dot$$' | head -n 1)
+
+graph-png:
+	@echo "--- [Graph] Generating latest_schema.png from latest DOT artifact ---"
 	@dot -Tpng $(BUILDS)/$$(ls -t $(BUILDS) | grep '\.dot$$' | head -n 1) \
 		-o $(BUILDS)/latest_schema.png
-	@open $(BUILDS)/latest_schema.png
+	@echo "✅ Graph PNG written to $(BUILDS)/latest_schema.png"
 
-# Remove generated relay/docs artifacts only.
+size:
+	@echo "--- [Inspect] Artifact size ---"
+	@ls -lh $(OUTPUT)
+
+checksum:
+	@echo "--- [Inspect] SHA-256 checksum ---"
+	@shasum -a 256 $(OUTPUT)
+
+inspect: size checksum
+	@echo "--- [Inspect] First 20 anchors via JS reader ---"
+	@$(NODE) -e "import fs from 'node:fs'; import RelayDB from './packages/relaydb-js/src/index.js'; const b=fs.readFileSync('$(OUTPUT)'); const ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength); const db=RelayDB.fromBytes(ab); console.log(db.anchors().slice(0,20));"
+
+# ==============================================================================
+# Rust-Backed Memory / Graph Health Audits
+# ==============================================================================
+# These define the interface we want.
+# Next implementation work: add `audit-memory` subcommands to src/bin/relay.rs
+# or create src/bin/audit_memory.rs.
+#
+# Proposed Rust CLI:
+#
+# cargo run --bin relay -- audit-memory --input ../atlas-memory/relaydb_v1_self_documentation.jsonl --mode all
+# cargo run --bin relay -- audit-memory --input ../atlas-memory/relaydb_v1_self_documentation.jsonl --mode duplicates
+# cargo run --bin relay -- audit-memory --input ../atlas-memory/relaydb_v1_self_documentation.jsonl --mode missing
+# cargo run --bin relay -- audit-memory --input ../atlas-memory/relaydb_v1_self_documentation.jsonl --mode orphans
+# ==============================================================================
+
+validate-memory:
+	@echo "--- [Memory] Validating JSON/JSONL parseability and anchor presence ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode validate
+
+memory-summary:
+	@echo "--- [Memory] Summary ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode summary
+
+duplicates:
+	@echo "--- [Memory] Duplicate anchor audit ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode duplicates
+
+missing:
+	@echo "--- [Memory] Missing internal anchor audit ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode missing
+
+orphans:
+	@echo "--- [Memory] Orphan node audit ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode orphans
+
+external:
+	@echo "--- [Memory] External reference audit ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode external
+
+cycles:
+	@echo "--- [Memory] Cycle summary ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode cycles
+
+memory-audit:
+	@echo "--- [Memory] Full graph-health audit ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- \
+		audit-memory \
+		--input ../$(INPUT) \
+		--mode all
+
+# ==============================================================================
+# Memory Merge / Patch Generation
+# ==============================================================================
+# Rust-first direction:
+#   These should become Rust commands too.
+#
+# Proposed future CLI:
+#   cargo run --bin relay -- merge-memory --base ... --patches ... --branches ... --plans ... --output ...
+#   cargo run --bin relay -- generate-patch --kind makefile-audit-suite --output ...
+# ==============================================================================
+
+merge-memory: init-dirs
+	@echo "--- [Memory] TODO: implement Rust merge-memory command ---"
+	@echo "Target interface:"
+	@echo "cd $(COMPILER_DIR) && cargo run --bin relay -- merge-memory --base ../$(MEMORY_BASE) --patches ../$(MEMORY_PATCHES) --branches ../$(MEMORY_BRANCHES) --plans ../$(MEMORY_PLANS) --output ../$(MEMORY_COMPILED)"
+	@false
+
+patch-next: init-dirs
+	@echo "--- [Memory] TODO: implement Rust generate-patch command ---"
+	@echo "Target interface:"
+	@echo "cd $(COMPILER_DIR) && cargo run --bin relay -- generate-patch --kind makefile-audit-suite --output ../$(MEMORY_PATCHES)/patch_001_makefile_audit_suite.jsonl"
+	@false
+
+# ==============================================================================
+# Release Packaging
+# ==============================================================================
+
+release: stable package
+	@echo "🚀 Release package ready in $(RELEASE_DIR)/$(RELEASE_NAME)"
+
+package: init-dirs
+	@echo "--- [Release] Packaging current .relay artifact and memory source ---"
+	@mkdir -p $(RELEASE_DIR)/$(RELEASE_NAME)
+	@cp $(OUTPUT) $(RELEASE_DIR)/$(RELEASE_NAME)/$(notdir $(OUTPUT))
+	@if [ -f "$(INPUT)" ]; then cp $(INPUT) $(RELEASE_DIR)/$(RELEASE_NAME)/$(notdir $(INPUT)); fi
+	@if ls $(BUILDS)/*.md >/dev/null 2>&1; then cp $$(ls -t $(BUILDS)/*.md | head -n 1) $(RELEASE_DIR)/$(RELEASE_NAME)/; fi
+	@if ls $(BUILDS)/*.dot >/dev/null 2>&1; then cp $$(ls -t $(BUILDS)/*.dot | head -n 1) $(RELEASE_DIR)/$(RELEASE_NAME)/; fi
+	@if [ -f "$(BUILDS)/latest_schema.png" ]; then cp $(BUILDS)/latest_schema.png $(RELEASE_DIR)/$(RELEASE_NAME)/; fi
+	@shasum -a 256 $(RELEASE_DIR)/$(RELEASE_NAME)/* > $(RELEASE_DIR)/$(RELEASE_NAME)/SHA256SUMS.txt
+	@echo "✅ Release files copied to $(RELEASE_DIR)/$(RELEASE_NAME)"
+
+# ==============================================================================
+# Cleaning
+# ==============================================================================
+
 clean-build:
-	@echo "--- Wiping RelayDB Build Artifacts ---"
+	@echo "--- [Clean] Wiping RelayDB build artifacts ---"
 	@rm -rf $(BUILDS)/*
 	@rm -f $(OUTPUT)
 
-# Deep clean Rust target files too.
 clean-cargo:
-	@echo "--- Running Cargo Clean ---"
+	@echo "--- [Clean] Running cargo clean ---"
 	@cd $(COMPILER_DIR) && cargo clean
 
-# Full clean
 clean: clean-build clean-cargo
 	@echo "✅ Clean complete."
 
+# ==============================================================================
+# Help
+# ==============================================================================
+
 help:
-	@echo "RelayDB Universal Engineering Interface"
+	@echo "RelayDB v1 Engineering Control Panel"
 	@echo ""
-	@echo "Primary commands:"
-	@echo "  make all       - Full pipeline: test -> build -> verify"
-	@echo "  make test      - Execute Rust unit/integration tests"
-	@echo "  make build     - Compile .json/.jsonl source memory into .relay"
-	@echo "  make verify    - Verify physical integrity of the .relay artifact"
-	@echo "  make jump      - Jump to an anchor in the .relay artifact"
-	@echo "  make demo      - Run full MVP demo pipeline"
+	@echo "Primary:"
+	@echo "  make all              test -> build -> verify"
+	@echo "  make stable           clean -> test -> self-docs -> verify -> js-smoke -> memory-audit -> graph-png -> checksum"
+	@echo "  make demo             self-docs -> verify -> jump-project -> js-smoke"
 	@echo ""
-	@echo "Utility commands:"
-	@echo "  make audit     - Open latest Markdown audit report"
-	@echo "  make graph     - Generate/open latest Graphviz PNG"
-	@echo "  make clean     - Remove artifacts and cargo build output"
+	@echo "Build / Run:"
+	@echo "  make build            Compile INPUT into OUTPUT"
+	@echo "  make self-docs        Compile relaydb_v1_self_documentation.jsonl"
+	@echo "  make verify           Verify physical .relay integrity"
+	@echo "  make jump             Jump to ANCHOR in OUTPUT"
+	@echo "  make js-smoke         Test JS reader against OUTPUT"
 	@echo ""
-	@echo "Config variables:"
+	@echo "Memory Audits:"
+	@echo "  make validate-memory  Validate JSON/JSONL and anchors"
+	@echo "  make duplicates       Fail on duplicate anchors"
+	@echo "  make missing          Fail on missing internal references"
+	@echo "  make orphans          Warn about unreferenced nodes"
+	@echo "  make external         List external: references"
+	@echo "  make cycles           Report cycles"
+	@echo "  make memory-audit     Full memory audit"
+	@echo ""
+	@echo "Memory Workflow:"
+	@echo "  make merge-memory     TODO: Rust implementation"
+	@echo "  make patch-next       TODO: Rust implementation"
+	@echo ""
+	@echo "Artifacts:"
+	@echo "  make audit            Open latest Markdown audit artifact"
+	@echo "  make graph            Open latest DOT artifact"
+	@echo "  make graph-png        Generate latest_schema.png"
+	@echo "  make inspect          Size/checksum/anchor preview"
+	@echo "  make release          Build and package release cartridge"
+	@echo ""
+	@echo "Config:"
 	@echo "  INPUT=$(INPUT)"
 	@echo "  OUTPUT=$(OUTPUT)"
 	@echo "  ANCHOR=$(ANCHOR)"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make build INPUT=atlas-memory/relaydb_atlas_tagged_memory.jsonl OUTPUT=relay-compiler/builds/relaydb-docs.relay"
-	@echo "  make jump ANCHOR=function:fetch_entry"
-	@echo "  make jump ANCHOR=project:relaydb FILTER=RelayDB"

@@ -28,7 +28,9 @@ build/
 target/
 **/*.rs.bk
 
-# --- RelayDB Binaries ---
+# --- RelayDB Generated Build Artifacts ---
+relay-compiler/builds/*
+!relay-compiler/builds/.gitkeep
+
+# Optional: ignore generated relay artifacts everywhere unless intentionally released
 *.relay
-!builds/
-!builds/*.relay
