@@ -5,8 +5,8 @@
     </td>
     <td valign="middle">
       <h1>RelayDB</h1>
-      <p><strong>The Bacon Standard</strong><br/>
-      <em>A compiled read layer for static relational knowledge.</em></p>
+      <p><strong>Universal 4-Tag Memory Compiler</strong><br/>
+      <em>A compiled read layer for static relational data and structured project memory.</em></p>
     </td>
   </tr>
 </table>
@@ -16,11 +16,43 @@ RelayDB is a Rust-based compiler-and-runtime system for **static, relational, re
 It is designed for situations where data is already known at build time and does **not** need the full overhead of a live-query database in production. Instead of repeatedly importing, mapping, and manually stitching together scattered JSON files at runtime, RelayDB lets you:
 
 - author related data with a simple **4-tag model**
+- use either `.json` or `.jsonl` source files
 - validate structure and topology at build time
-- compile that data into a portable, read-only `.relay` artifact
-- retrieve and traverse it through explicit anchors and relationships
+- compile that source into a portable, read-only `.relay` artifact
+- verify physical artifact integrity
+- retrieve and traverse compiled memory through explicit anchors and relationships
 
-RelayDB is **not** a database replacement. It is a **compiled read layer** for data that is effectively finished before deployment.
+RelayDB is **not** a database replacement. It is a **compiled read layer** for data and project memory that are effectively finished before deployment.
+
+---
+
+## Current status
+
+RelayDB v1 is a working proof of concept.
+
+The current foundation supports:
+
+- universal `.json` / `.jsonl` ingestion
+- configurable input paths
+- configurable `.relay` output filenames
+- physical integrity verification
+- recursive anchor traversal
+- generated Markdown audit reports
+- generated Graphviz DOT topology files
+- self-documentation through compiled RelayDB memory
+
+The current proof loop is:
+
+```text
+RelayDB project facts
+→ tagged JSONL source memory
+→ RelayDB compiler
+→ verified .relay artifact
+→ relay jump traversal
+→ self-documenting project graph
+```
+
+RelayDB can now compile its own structured documentation into a `.relay` file and navigate that compiled project memory.
 
 ---
 
@@ -34,25 +66,41 @@ You need these installed **before** running RelayDB:
 - **make**
 - **Graphviz** (`dot`) for graph rendering
 
+On macOS, Graphviz can be installed with:
+
+```bash
+brew install graphviz
+```
+
 ### Important directory note
 
 Run all `make` commands from the **top-level `RelayDB/` directory**, not from `relay-compiler/`.
 
-- `RelayDB/` = repo root
-- `relay-compiler/` = Rust subproject
-- `data/` = source JSON files
-- `Makefile` = lives at the top level and orchestrates the workflow
+```text
+RelayDB/          = repo root
+relay-compiler/  = Rust subproject
+data/            = legacy/demo JSON files
+atlas-memory/    = tagged JSONL project-memory files
+Makefile         = top-level workflow orchestrator
+```
 
-### Minimal repo map
+If you are on Linux or Windows, you may need to adjust any `open` commands used by the current `Makefile`.
+
+---
+
+## Minimal repo map
 
 ```text
 RelayDB/
 ├── Makefile
 ├── README.md
+├── RelayDB-Logo.png
 ├── data/
 │   ├── actors.json
 │   ├── directors.json
 │   └── movies.json
+├── atlas-memory/
+│   └── relaydb_v1_self_documentation.jsonl
 ├── relay-compiler/
 │   ├── Cargo.toml
 │   ├── src/
@@ -66,23 +114,23 @@ RelayDB/
 └── RelayDB_v2_Final_Project_Specification.md
 ```
 
-If you are on Linux or Windows, you may need to adjust any `open` commands used by the current `Makefile`.
-
 ---
 
 ## Quick start
 
-### 1. From the top-level `RelayDB/` directory
+### Full default pipeline
+
+From the top-level `RelayDB/` directory:
 
 ```bash
 make all
 ```
 
-This runs the full pipeline:
+This runs:
 
-1. tests
-2. build
-3. verification
+```text
+test → build → verify
+```
 
 Generated artifacts are written under:
 
@@ -90,47 +138,116 @@ Generated artifacts are written under:
 relay-compiler/builds/
 ```
 
-### 2. Individual commands
+---
+
+## Compile the RelayDB self-documentation artifact
+
+The current self-documentation source file is:
+
+```text
+atlas-memory/relaydb_v1_self_documentation.jsonl
+```
+
+Compile it into a `.relay` artifact:
+
+```bash
+make build \
+  INPUT=atlas-memory/relaydb_v1_self_documentation.jsonl \
+  OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay
+```
+
+Verify the compiled artifact:
+
+```bash
+make verify \
+  OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay
+```
+
+Jump into the project root memory node:
+
+```bash
+make jump \
+  OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay \
+  ANCHOR=project:relaydb
+```
+
+Jump to a specific function:
+
+```bash
+make jump \
+  OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay \
+  ANCHOR=function:relay_jump_from
+```
+
+Jump to a specific concept:
+
+```bash
+make jump \
+  OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay \
+  ANCHOR=concept:self-documentation-loop
+```
+
+---
+
+## Individual Makefile commands
 
 From the top-level `RelayDB/` directory:
 
-#### Run tests
+### Run tests
 
 ```bash
 make test
 ```
 
-#### Build the `.relay` artifact and reports
+### Build a `.relay` artifact
 
 ```bash
 make build
 ```
 
-#### Verify the baked binary
+You can override the input and output:
 
 ```bash
-make verify
+make build INPUT=atlas-memory/relaydb_v1_self_documentation.jsonl OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay
 ```
 
-#### Open the latest markdown audit report
+### Verify a `.relay` artifact
+
+```bash
+make verify OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay
+```
+
+### Jump to an anchor
+
+```bash
+make jump OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay ANCHOR=project:relaydb
+```
+
+### Optional filter
+
+```bash
+make jump OUTPUT=relay-compiler/builds/relaydb-v1-self-docs.relay ANCHOR=project:relaydb FILTER=compiler
+```
+
+### Open the latest Markdown audit report
 
 ```bash
 make audit
 ```
 
-#### Generate and open the graph PNG
+### Generate and open the graph PNG
 
 ```bash
 make graph
 ```
 
-#### Clean build products
+### Clean build products
 
 ```bash
 make clean
 ```
 
-#### Show available commands
+### Show available commands
 
 ```bash
 make help
@@ -146,34 +263,50 @@ If you want to run the Rust tools manually, switch into the Rust subproject firs
 cd relay-compiler
 ```
 
-Then use Cargo commands like:
-
 ### Compile / bake
 
 ```bash
-cargo run --bin compiler --quiet
+cargo run --bin compiler -- \
+  --input ../atlas-memory/relaydb_v1_self_documentation.jsonl \
+  --output ./builds/relaydb-v1-self-docs.relay \
+  --builds ./builds
 ```
 
 ### Run tests
 
 ```bash
-cargo test --quiet
+cargo test
 ```
 
-### Verify the artifact
+### Verify a `.relay` file
 
 ```bash
-cargo run --bin relay -- check
+cargo run --bin relay -- \
+  check \
+  --file ./builds/relaydb-v1-self-docs.relay
 ```
 
 ### Jump to an anchor
 
 ```bash
-cargo run --bin relay -- jump the_terminal -f Drama
+cargo run --bin relay -- \
+  jump \
+  --file ./builds/relaydb-v1-self-docs.relay \
+  project:relaydb
 ```
 
-> Current CLI commands are `jump` and `check`.  
-> The longer-term v2 direction expands this into a more formal command surface.
+### Strict acyclic mode
+
+By default, RelayDB allows semantic graph cycles because project-memory graphs are often relational.
+
+To fail the build if a cycle exists:
+
+```bash
+cargo run --bin compiler -- \
+  --input ../atlas-memory/relaydb_v1_self_documentation.jsonl \
+  --output ./builds/relaydb-v1-self-docs.relay \
+  --strict-acyclic
+```
 
 ---
 
@@ -186,16 +319,19 @@ RelayDB is:
 - a **portable `.relay` binary artifact**
 - a **read-only runtime retrieval engine**
 - a **toolchain for audit, graphing, and validation**
+- a **project-memory foundation for documentation and AI-assisted development**
 
 RelayDB is optimized for:
 
 - static knowledge bundles
-- documentation engines
+- structured documentation
+- self-documenting projects
 - localization / i18n data
 - product or content catalogs
 - reference sites
 - frontend applications that need structured related data without backend complexity
 - RAG prefiltering / structural context assembly
+- AI project-memory handoff
 
 ---
 
@@ -211,6 +347,7 @@ It is **not**:
 - a query planner
 - a CRUD backend
 - a full-text search engine
+- a replacement for SQLite, Postgres, Redis, MongoDB, or graph databases
 
 The source files are the authored truth.  
 The `.relay` file is the **compiled truth**.
@@ -232,22 +369,26 @@ then RelayDB asks a simple question:
 
 **Why pay runtime database overhead to rediscover structure that could have been compiled once?**
 
-That is the problem RelayDB is built to solve.
+RelayDB now extends that same idea to project memory:
+
+**Why should humans and AI assistants repeatedly rediscover project structure, design decisions, side effects, and documentation relationships when those facts can be compiled once into a navigable artifact?**
 
 ---
 
 ## The 4-Tag Model
 
-Relay source data uses four reserved prefixes:
+Relay source memory uses four reserved prefixes:
 
 | Prefix | Name | Purpose |
 |---|---|---|
 | `#` | Anchor | Unique, stable node identity |
-| `^` | Topic | Primary classification / type |
-| `@` | Baton | Traversable relationship edges |
-| `~` | Metadata | Non-traversed descriptive/filterable fields |
+| `^` | Provenance | Source, parent, upstream context, or classification |
+| `@` | Relay Link | Traversable relationship edges |
+| `~` | Alias | Search terms, labels, aliases, or retrieval hints |
 
-### Example
+RelayDB also supports the legacy `#id` field for older RelayDB data.
+
+### JSON example
 
 ```json
 [
@@ -263,24 +404,31 @@ Relay source data uses four reserved prefixes:
 ]
 ```
 
+### JSONL project-memory example
+
+```jsonl
+{"#":"function:relay_jump_from","type":"function","name":"relay_jump_from","file":"src/lib.rs","summary":"Recursively navigates a chosen .relay file starting from an anchor, displays matching nodes, follows @ links, and uses a visited set to avoid infinite recursion.","^":["module:relay_compiler_lib","concept:recursive-jump-traversal"],"@":["function:get_address_from","function:fetch_entry_from","function:process_baton"],"~":["relay jump","recursive traversal","graph navigation"]}
+```
+
 ### Meaning
 
-- `#id` gives the node a stable identity.
-- `^` tells Relay what kind of node it is.
-- `@cast` and `@director` define graph relationships.
-- `~genres` provides metadata that can be filtered or inspected but is not traversed as an edge.
+- `#` gives the node a stable identity.
+- `^` records where the node comes from or what it belongs to.
+- `@` defines graph relationships.
+- `~` provides aliases and retrieval terms.
 
 ---
 
 ## Current project shape
 
-The current RelayDB codebase already includes:
+The current RelayDB codebase includes:
 
-- a **compiler** that ingests JSON and bakes a `.relay` artifact
-- a **library crate** that handles retrieval and traversal logic
+- a **universal compiler** that ingests `.json` and `.jsonl`
+- a **library crate** that handles protocol constants, tag extraction, retrieval, integrity checks, and traversal
 - a **CLI** for jumping and verifying
-- a **verifier** for integrity checks
+- a **verifier** for physical integrity checks
 - generated **audit** and **graph** artifacts during build
+- a working **self-documentation memory file**
 
 The current implementation is the working foundation for the RelayDB v2 direction.
 
@@ -290,13 +438,23 @@ The current implementation is the working foundation for the RelayDB v2 directio
 
 RelayDB currently follows this pattern:
 
-1. Author related JSON source files
+1. Author related JSON or JSONL source files
 2. Run tests and validation
-3. Compile source into `bacon_standard.relay`
+3. Compile source into a chosen `.relay` artifact
 4. Verify the artifact
-5. Use the CLI or service layer to retrieve / traverse data
+5. Use the CLI or service layer to retrieve / traverse compiled memory
 
 At runtime, Relay reads from the compiled `.relay` artifact itself.
+
+```text
+source .json / .jsonl
+        ↓
+relay compiler
+        ↓
+compiled .relay artifact
+        ↓
+verify / jump / audit / docs
+```
 
 ---
 
@@ -304,13 +462,25 @@ At runtime, Relay reads from the compiled `.relay` artifact itself.
 
 The top-level `Makefile` provides the main developer workflow:
 
-- `make all` → full pipeline: **Test → Build → Verify**
+- `make all` → full pipeline: **test → build → verify**
 - `make test` → run Rust unit tests
-- `make build` → compile the `.relay` file and generate `.md` / `.dot` artifacts
-- `make verify` → perform integrity checks on the baked artifact
-- `make audit` → open the latest markdown audit report
+- `make build` → compile `.json` / `.jsonl` source into `.relay`
+- `make verify` → perform physical integrity checks on the baked artifact
+- `make jump` → jump into a compiled `.relay` artifact by anchor
+- `make audit` → open the latest Markdown audit report
 - `make graph` → convert the latest `.dot` file into a PNG and open it
 - `make clean` → wipe generated artifacts and Rust build outputs
+- `make help` → show workflow help
+
+Longer term, the Makefile will become RelayDB’s audit and compliance interface for graph-health checks such as:
+
+- duplicate anchors
+- missing internal anchors
+- orphan nodes
+- external references
+- strict cycle checks
+- release packaging
+- checksums
 
 ---
 
@@ -318,14 +488,37 @@ The top-level `Makefile` provides the main developer workflow:
 
 The current working implementation:
 
-- compiles source JSON into a single `.relay` artifact
+- compiles `.json` and `.jsonl` source into a single `.relay` artifact
+- supports configurable input and output paths
+- supports both `#` and `#id` anchors
+- extracts relationship links from `@` and `^` fields
+- handles string links and array links
 - records byte offsets for compiled nodes
-- resolves anchors through an index
+- writes a tab-separated jump table so anchors may contain colons
+- resolves anchors through the jump table
 - retrieves node payloads from the compiled file
-- follows `@` batons recursively
+- follows `@` relay links recursively
+- uses a visited set to avoid infinite recursion
 - verifies index-to-payload integrity
 
-This means runtime retrieval is based on the compiled artifact, not on reopening the original source JSON files.
+This means runtime retrieval is based on the compiled artifact, not on reopening the original source JSON or JSONL files.
+
+---
+
+## Current limitations
+
+RelayDB v1 is intentionally still a proof-of-concept foundation.
+
+Known limitations:
+
+- Anchor lookup currently scans the text jump table before seeking to the byte offset.
+- The byte seek is direct after anchor resolution, but lookup should not be described as strict O(1) yet.
+- Graph cycles are allowed by default and reported as warnings unless strict mode is enabled.
+- The audit suite is not complete yet.
+- Missing-anchor, duplicate-anchor, orphan-node, and external-reference checks are planned hardening work.
+- The docs viewer has not been built yet.
+
+These limitations are being kept explicit to avoid overstating the current implementation.
 
 ---
 
@@ -350,17 +543,54 @@ RelayDB already shows value in a few key areas:
 
 - reducing repetitive frontend / backend glue code
 - centralizing relationship traversal logic
-- turning scattered JSON into a coherent compiled artifact
+- turning scattered JSON or JSONL into a coherent compiled artifact
 - generating explainability artifacts during build
 - making static relational data easier to consume from apps and services
+- compiling structured project documentation into navigable memory
+- exposing documentation holes through missing-anchor warnings
+- providing a foundation for AI project-memory handoff
 
 A React bootstrap prototype was able to consume Relay with very little code, which is exactly the kind of developer experience Relay is intended to improve.
 
 ---
 
+## Self-documentation proof
+
+RelayDB can now document itself.
+
+The current self-documentation pipeline is:
+
+```text
+RelayDB implementation facts
+→ relaydb_v1_self_documentation.jsonl
+→ relaydb-v1-self-docs.relay
+→ make verify
+→ make jump ANCHOR=project:relaydb
+```
+
+The self-documentation artifact currently demonstrates:
+
+- project identity
+- tagged source-memory rules
+- binary format
+- protocol constants
+- compiler functions
+- library functions
+- CLI binaries
+- recursive traversal
+- physical integrity checking
+- audit artifacts
+- risks
+- decisions
+- test evidence
+
+This is the foundation for a future docs viewer powered by the compiled `.relay` artifact itself.
+
+---
+
 ## RelayDB v2 direction
 
-The project now has a formal **RelayDB v2.0 Master Specification**.
+The project has a formal **RelayDB v2.0 Master Specification**.
 
 The v2 direction centers on:
 
@@ -371,6 +601,8 @@ The v2 direction centers on:
 - tiered integrity verification
 - benchmark-driven performance claims
 - topic-neutral core behavior
+- stronger graph-health auditing
+- versioned release cartridges
 
 The high-level philosophy is:
 
@@ -382,20 +614,35 @@ The high-level philosophy is:
 
 The next major artifacts for the project are:
 
-1. **Binary Appendix**
+1. **Makefile Audit Suite**
+   - duplicate anchor checks
+   - missing internal anchor checks
+   - orphan node checks
+   - external reference policy
+   - release/checksum targets
+
+2. **Graph Health Audit Command**
+   - separate physical artifact verification from semantic graph quality
+
+3. **Memory Patch Workflow**
+   - standard JSONL
+   - patch JSONL files
+   - merged full memory file
+
+4. **Docs Viewer**
+   - webpage that reads the compiled `.relay` self-documentation artifact
+
+5. **Binary Appendix**
    - exact code-adjacent header / index / node structs
 
-2. **Diagnostics Appendix**
+6. **Diagnostics Appendix**
    - compiler and verifier output schema
 
-3. **Structured Result Packet Schema**
+7. **Structured Result Packet Schema**
    - canonical API / JSON response shape
 
-4. **v2 Prototype Reader / Writer**
-   - smallest compliant v2 artifact builder and reader
-
-5. **Benchmark Harness**
-   - RelayDB v1.1 vs RelayDB v2 vs JSON scan vs SQLite
+8. **Benchmark Harness**
+   - RelayDB v1 vs RelayDB v2 vs JSON scan vs SQLite
 
 ---
 
@@ -413,14 +660,19 @@ RelayDB is still evolving, but contributions are welcome from developers interes
 - frontend integration examples
 - WASM exploration
 - CI / CD automation
+- documentation tooling
+- AI-assisted development workflows
 
 Good contribution targets include:
 
+- audit suite hardening
 - cleaner structured API output
 - generalized graph generation
 - hardening error handling
 - replacing prototype-grade shell integrations with proper service layers
 - benchmarking and profiling the runtime
+- docs viewer development
+- missing-anchor and orphan-node reporting
 
 ---
 
@@ -432,8 +684,10 @@ RelayDB should stay:
 - strong in guarantees
 - easy to explain
 - useful to frontend and app developers
+- useful to AI-assisted development workflows
 - evidence-driven in performance claims
+- honest about current limitations
 
 The goal is not to become everything.
 
-The goal is to become **very good at compiling static relational data into a trusted read artifact**.
+The goal is to become **very good at compiling static relational data and project memory into a trusted read artifact**.

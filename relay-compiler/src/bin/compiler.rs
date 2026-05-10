@@ -1,8 +1,37 @@
-use relay_compiler::{HEADER_SIZE, POINTER_START, solder_node};
+use clap::Parser;
+use relay_compiler::{
+    HEADER_SIZE, POINTER_START, extract_anchor_id, extract_links_from_node, solder_node,
+};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Result, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+
+// --- CLI Args ---
+
+#[derive(Parser, Debug)]
+#[command(name = "relay-compiler")]
+#[command(version = "1.2")]
+#[command(about = "Universal RelayDB compiler for .json and .jsonl source memory")]
+struct Args {
+    /// Input file or directory containing .json / .jsonl files
+    #[arg(short, long, default_value = "../data")]
+    input: PathBuf,
+
+    /// Output .relay filename
+    #[arg(short, long, default_value = "output.relay")]
+    output: PathBuf,
+
+    /// Directory for generated audit artifacts
+    #[arg(short = 'b', long, default_value = "builds")]
+    builds: PathBuf,
+
+    /// Fail the build if the relationship graph contains cycles.
+    /// Default is false because ATLAS/project-memory graphs commonly contain valid semantic cycles.
+    #[arg(long, default_value_t = false)]
+    strict_acyclic: bool,
+}
 
 // --- Core Data Structures ---
 
@@ -13,180 +42,308 @@ struct GraphAnalysis {
 
 /**
  * @bin compiler
- * @description The build engine for RelayDB.
- * Orchestrates the transition from raw JSON fragments to a unified
- * and validated 4-Tag Protocol binary.
+ * @description Universal build engine for RelayDB.
+ * Converts .json and .jsonl files into a validated .relay binary.
  */
 fn main() -> Result<()> {
-    println!("--- RELAY-LINKER: v1.1 SMART-LINKER ACTIVATED ---");
+    let args = Args::parse();
+
+    println!("--- RELAY-LINKER: v1.2 UNIVERSAL COMPILER ACTIVATED ---");
+    println!("Input:  {}", args.input.display());
+    println!("Output: {}", args.output.display());
 
     // 1. PHASE: Ingestion
-    // Pulls raw data from the edge (JSON files) into memory.
-    let analysis = ingest_data("../data")?;
+    let analysis = ingest_data(&args.input)?;
 
     // 2. PHASE: Validation
-    // The "Unbreakable Gate": Ensures no circular references exist before baking.
-    println!("Validating Topology...");
-    verify_no_cycles(&analysis.adj_list)
-        .map_err(|e| {
+    println!(
+        "Validating topology across {} nodes...",
+        analysis.nodes.len()
+    );
+
+    match verify_no_cycles(&analysis.adj_list) {
+        Ok(()) => {
+            println!("Topology check passed: no cycles detected.");
+        }
+        Err(e) if args.strict_acyclic => {
             eprintln!("FATAL: Circular reference detected at '{}'. Aborting.", e);
             std::process::exit(1);
-        })
-        .ok();
+        }
+        Err(e) => {
+            println!(
+                "WARNING: Circular reference detected at '{}'. Continuing because strict acyclic mode is off.",
+                e
+            );
+        }
+    }
 
     // 3. PHASE: Artifact Generation
-    // Generates the .md audit and .dot visual schema for documentation.
     let dtg = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-    generate_artifacts(&analysis, &dtg)?;
+    generate_artifacts(&analysis, &dtg, &args.builds, &args.output)?;
 
     // 4. PHASE: Binary Bake
-    // Performs the final "solder" of the .relay binary file.
-    bake_binary(&analysis, "bacon_standard.relay")?;
+    bake_binary(&analysis, &args.output)?;
 
     Ok(())
 }
 
-// --- Logic Modules ---
+// --- Ingestion ---
 
-fn ingest_data(data_path: &str) -> Result<GraphAnalysis> {
+fn ingest_data(input_path: &Path) -> Result<GraphAnalysis> {
     let mut analysis = GraphAnalysis {
         nodes: Vec::new(),
         adj_list: HashMap::new(),
     };
 
-    for entry in fs::read_dir(data_path)? {
-        let path = entry?.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let content = fs::read_to_string(&path)?;
-            let entries: Vec<Value> = serde_json::from_str(&content)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let files = collect_input_files(input_path)?;
 
-            for node in entries {
-                let id = node["#id"].as_str().unwrap_or("unknown").to_string();
-                let mut links = Vec::new();
+    for path in files {
+        let mut nodes = read_nodes_from_file(&path)?;
 
-                if let Some(obj) = node.as_object() {
-                    for (key, val) in obj {
-                        // Capture Batons (@) and Topics (^) for the adjacency list
-                        if (key.starts_with('@') || key.starts_with('^')) && val.is_string() {
-                            links.push(val.as_str().unwrap().to_string());
-                        }
-                    }
-                }
-                analysis.adj_list.insert(id, links);
-                analysis.nodes.push(node);
-            }
+        for node in nodes.drain(..) {
+            let id = extract_anchor_id(&node).unwrap_or("unknown").to_string();
+
+            let links = extract_links_from_node(&node);
+
+            analysis.adj_list.insert(id, links);
+            analysis.nodes.push(node);
         }
     }
+
     Ok(analysis)
 }
 
-fn generate_artifacts(analysis: &GraphAnalysis, dtg: &str) -> Result<()> {
-    fs::create_dir_all("builds")?;
+fn collect_input_files(input_path: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
 
-    // 3a. Generate Markdown Audit
+    if input_path.is_file() {
+        if is_supported_data_file(input_path) {
+            files.push(input_path.to_path_buf());
+        }
+        return Ok(files);
+    }
+
+    for entry in fs::read_dir(input_path)? {
+        let path = entry?.path();
+
+        if path.is_file() && is_supported_data_file(&path) {
+            files.push(path);
+        }
+    }
+
+    files.sort();
+    Ok(files)
+}
+
+fn is_supported_data_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|s| s.to_str()),
+        Some("json") | Some("jsonl")
+    )
+}
+
+fn read_nodes_from_file(path: &Path) -> Result<Vec<Value>> {
+    match path.extension().and_then(|s| s.to_str()) {
+        Some("json") => read_json_nodes(path),
+        Some("jsonl") => read_jsonl_nodes(path),
+        _ => Ok(Vec::new()),
+    }
+}
+
+fn read_json_nodes(path: &Path) -> Result<Vec<Value>> {
+    let content = fs::read_to_string(path)?;
+    let parsed: Value = serde_json::from_str(&content)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+    if let Some(list) = parsed.as_array() {
+        Ok(list.clone())
+    } else if parsed.is_object() {
+        Ok(vec![parsed])
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{} must contain a JSON object or array", path.display()),
+        ))
+    }
+}
+
+fn read_jsonl_nodes(path: &Path) -> Result<Vec<Value>> {
+    let content = fs::read_to_string(path)?;
+    let mut nodes = Vec::new();
+
+    for (line_index, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let node: Value = serde_json::from_str(trimmed).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "{} line {} is not valid JSONL: {}",
+                    path.display(),
+                    line_index + 1,
+                    e
+                ),
+            )
+        })?;
+
+        if !node.is_object() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "{} line {} must be a JSON object",
+                    path.display(),
+                    line_index + 1
+                ),
+            ));
+        }
+
+        nodes.push(node);
+    }
+
+    Ok(nodes)
+}
+
+// --- Artifact Generation ---
+
+fn generate_artifacts(
+    analysis: &GraphAnalysis,
+    dtg: &str,
+    builds_dir: &Path,
+    output_path: &Path,
+) -> Result<()> {
+    fs::create_dir_all(builds_dir)?;
+
     let mut hub_counts: HashMap<String, usize> = HashMap::new();
+
     for links in analysis.adj_list.values() {
         for link in links {
             *hub_counts.entry(link.clone()).or_insert(0) += 1;
         }
     }
 
-    let md_path = format!("builds/relaySchema_{}.md", dtg);
+    let md_path = builds_dir.join(format!("relaySchema_{}.md", dtg));
     let mut md_file = fs::File::create(md_path)?;
-    writeln!(md_file, "# RelayDB System Audit: {}\n", dtg)?;
-    writeln!(
-        md_file,
-        "## 🛡️ Integrity Status\n- **Topology:** UNBREAKABLE ✅\n- **Cycle Detection:** Passed (Checked {} nodes)\n",
-        analysis.nodes.len()
-    )?;
 
-    writeln!(md_file, "## 🚀 High-Frequency Anchors (Hubs)")?;
-    let mut hubs: Vec<_> = hub_counts.into_iter().collect();
-    hubs.sort_by(|a, b| b.1.cmp(&a.1));
-    for (id, count) in hubs.iter().take(10) {
-        writeln!(md_file, "- **{}**: {} incoming relationships", id, count)?;
+    writeln!(md_file, "# RelayDB System Audit: {}\n", dtg)?;
+    writeln!(md_file, "## Build Output")?;
+    writeln!(md_file, "- **Relay File:** `{}`", output_path.display())?;
+    writeln!(md_file, "- **Nodes:** {}", analysis.nodes.len())?;
+    writeln!(md_file)?;
+
+    writeln!(md_file, "## Integrity Status")?;
+
+    match verify_no_cycles(&analysis.adj_list) {
+        Ok(()) => {
+            writeln!(md_file, "- **Topology:** Acyclic ✅")?;
+            writeln!(md_file, "- **Cycle Detection:** No cycles detected")?;
+        }
+        Err(e) => {
+            writeln!(md_file, "- **Topology:** Relational graph with cycles ⚠️")?;
+            writeln!(
+                md_file,
+                "- **Cycle Detection:** First detected cycle near `{}`",
+                e
+            )?;
+            writeln!(
+                md_file,
+                "- **Note:** Cycles are allowed unless `--strict-acyclic` is enabled."
+            )?;
+        }
     }
 
-    generate_dot_file(analysis, dtg)?;
+    writeln!(md_file)?;
+
+    writeln!(md_file, "## High-Frequency Anchors / Hubs")?;
+    let mut hubs: Vec<_> = hub_counts.into_iter().collect();
+    hubs.sort_by(|a, b| b.1.cmp(&a.1));
+
+    if hubs.is_empty() {
+        writeln!(md_file, "- No relationships found.")?;
+    } else {
+        for (id, count) in hubs.iter().take(10) {
+            writeln!(md_file, "- **{}**: {} incoming relationships", id, count)?;
+        }
+    }
+
+    generate_dot_file(analysis, dtg, builds_dir, output_path)?;
     Ok(())
 }
 
-fn generate_dot_file(analysis: &GraphAnalysis, dtg: &str) -> Result<()> {
-    let dot_path = format!("builds/relaySchema_{}.dot", dtg);
+fn generate_dot_file(
+    analysis: &GraphAnalysis,
+    dtg: &str,
+    builds_dir: &Path,
+    output_path: &Path,
+) -> Result<()> {
+    let dot_path = builds_dir.join(format!("relaySchema_{}.dot", dtg));
     let mut f = fs::File::create(dot_path)?;
+
+    writeln!(f, "digraph RelaySchema {{")?;
+    writeln!(f, "  rankdir=LR;")?;
     writeln!(
         f,
-        "digraph RelaySchema {{\n  rankdir=LR;\n  node [shape=box, style=filled, fillcolor=lightgray, fontname=\"Arial\"];"
+        "  node [shape=box, style=filled, fillcolor=lightgray, fontname=\"Arial\"];"
     )?;
     writeln!(
         f,
-        "  \"RelayDB_Root\" [shape=cylinder, fillcolor=gold, label=\"bacon_standard.relay\"];"
+        "  \"RelayDB_Root\" [shape=cylinder, fillcolor=gold, label=\"{}\"];",
+        output_path.display()
     )?;
 
-    let categories = [
-        ("directors", "royalblue1"),
-        ("movies", "tomato"),
-        ("actors", "springgreen3"),
-    ];
-    for (cat, color) in categories {
-        writeln!(
-            f,
-            "  subgraph cluster_{} {{ label=\"{}\"; style=dashed; color=\"{}\";",
-            cat,
-            cat.to_uppercase(),
-            color
-        )?;
-        for (node, links) in &analysis.adj_list {
-            if links.contains(&cat.to_string()) {
-                writeln!(f, "    \"{}\" [fillcolor=\"{}\"];", node, color)?;
-            }
-        }
-        writeln!(f, "  }}")?;
+    for node in analysis.adj_list.keys() {
+        writeln!(f, "  \"{}\";", node)?;
     }
 
     for (node, links) in &analysis.adj_list {
         for link in links {
-            if ["directors", "movies", "actors"].contains(&link.as_str()) {
-                writeln!(f, "  \"RelayDB_Root\" -> \"{}\" [style=bold];", link)?;
-            }
             writeln!(f, "  \"{}\" -> \"{}\";", node, link)?;
         }
     }
+
     writeln!(f, "}}")?;
     Ok(())
 }
 
-fn bake_binary(analysis: &GraphAnalysis, output_path: &str) -> Result<()> {
-    println!("Validation passed. Soldering binary...");
+// --- Binary Bake ---
+
+fn bake_binary(analysis: &GraphAnalysis, output_path: &Path) -> Result<()> {
+    println!("Validation complete. Soldering binary...");
+
     let mut file = fs::File::create(output_path)?;
 
-    // Step A: Reserve space for the header using the library constant
+    // Step A: Reserve header space
     file.write_all(&vec![0u8; HEADER_SIZE as usize])?;
 
-    // Step B: Solder entries via lib.rs protocol
+    // Step B: Solder node payloads
     let mut jump_table: HashMap<String, u64> = HashMap::new();
+
     for entry in &analysis.nodes {
-        let id = entry["#id"].as_str().unwrap_or("unknown").to_string();
+        let id = extract_anchor_id(entry).unwrap_or("unknown").to_string();
 
-        // DELEGATION: The library now handles the physical write and terminator logic
         let pos = solder_node(&mut file, entry)?;
-
         jump_table.insert(id, pos);
     }
 
-    // Step C: Write Jump Table at end of file
+    // Step C: Write jump table
     let index_pos = file.stream_position()?;
-    for (id, offset) in &jump_table {
-        writeln!(file, "{}:{}", id, offset)?;
+
+    let mut sorted: Vec<_> = jump_table.into_iter().collect();
+    sorted.sort_by(|a, b| a.0.cmp(&b.0));
+
+    for (id, offset) in &sorted {
+        // Tab separator allows anchors like "function:fetch_entry".
+        writeln!(file, "{}\t{}", id, offset)?;
     }
 
-    // Step D: Standardized Pointer
-    // Write the index location to the Header using library constant (Byte 16)
+    // Step D: Write index pointer into header
     file.seek(SeekFrom::Start(POINTER_START))?;
     file.write_all(&index_pos.to_le_bytes())?;
 
-    println!("SUCCESS: '{}' is soldered.", output_path);
+    println!("SUCCESS: '{}' is soldered.", output_path.display());
     Ok(())
 }
 
@@ -195,11 +352,13 @@ fn bake_binary(analysis: &GraphAnalysis, output_path: &str) -> Result<()> {
 fn verify_no_cycles(adj: &HashMap<String, Vec<String>>) -> std::result::Result<(), String> {
     let mut visited = HashSet::new();
     let mut stack = HashSet::new();
+
     for node in adj.keys() {
         if has_cycle(node, adj, &mut visited, &mut stack) {
             return Err(node.clone());
         }
     }
+
     Ok(())
 }
 
@@ -212,18 +371,24 @@ fn has_cycle(
     if stack.contains(node) {
         return true;
     }
+
     if visited.contains(node) {
         return false;
     }
+
     visited.insert(node.clone());
     stack.insert(node.clone());
+
     if let Some(neighbors) = adj.get(node) {
         for neighbor in neighbors {
-            if has_cycle(neighbor, adj, visited, stack) {
+            // Only follow neighbors that are actual nodes in this graph.
+            // External tags/concepts can exist as references without being compiled nodes.
+            if adj.contains_key(neighbor) && has_cycle(neighbor, adj, visited, stack) {
                 return true;
             }
         }
     }
+
     stack.remove(node);
     false
 }

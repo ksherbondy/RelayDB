@@ -1,11 +1,26 @@
 {
   "name": "@relaydb/relaydb-js",
   "version": "0.1.0",
-  "description": "JavaScript reader for RelayDB v1 .relay files",
+  "description": "JavaScript reader for RelayDB v1/v1.2 .relay artifacts",
   "type": "module",
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js"
   },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "relaydb",
+    "relay",
+    "json",
+    "jsonl",
+    "compiled-data",
+    "project-memory",
+    "static-data",
+    "read-layer",
+    "documentation"
+  ],
   "license": "SEE LICENSE IN LICENSE"
 }

@@ -2,23 +2,80 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::path::Path;
 
 // --- PROTOCOL CONSTANTS ---
-// Centralized so that the Compiler and Reader always speak the same language.
+// Centralized so the Compiler and Reader always speak the same language.
 pub const POINTER_START: u64 = 16;
 pub const HEADER_SIZE: u64 = 32;
 pub const TERMINATOR: u8 = 0;
 
-// --- 1. DATA ACCESS LAYER (The Mechanisms) ---
+// Backwards-compatible default used by the older demo tools.
+pub const DEFAULT_RELAY_FILE: &str = "bacon_standard.relay";
+
+// --- 1. SHARED TAG / RELATIONSHIP HELPERS ---
 
 /**
- * @function get_address
- * @description Teleports to the Jump Table and retrieves the byte offset for an Anchor.
- * Returns Some(address) if found, or None if the coordinate doesn't exist or a file error occurs.
+ * @function extract_anchor_id
+ * @description Returns the stable anchor ID for a JSON node.
+ * Supports both RelayDB v1 style "#id" and ATLAS-style "#".
  */
-pub fn get_address(target_id: &str) -> Option<u64> {
-    // The '?' now correctly returns 'None' to the caller if these fail
-    let mut file = File::open("bacon_standard.relay").ok()?;
+pub fn extract_anchor_id(node: &Value) -> Option<&str> {
+    node.get("#id")
+        .and_then(Value::as_str)
+        .or_else(|| node.get("#").and_then(Value::as_str))
+}
+
+/**
+ * @function extract_links_from_node
+ * @description Shared relationship extractor for compiler and runtime rules.
+ * Captures string and array-valued links from @ and ^ tagged fields.
+ */
+pub fn extract_links_from_node(node: &Value) -> Vec<String> {
+    let mut links = Vec::new();
+
+    if let Some(obj) = node.as_object() {
+        for (key, value) in obj {
+            if key.starts_with('@') || key.starts_with('^') {
+                extract_links_from_value(value, &mut links);
+            }
+        }
+    }
+
+    links
+}
+
+fn extract_links_from_value(value: &Value, links: &mut Vec<String>) {
+    if let Some(link) = value.as_str() {
+        links.push(link.to_string());
+    } else if let Some(list) = value.as_array() {
+        for item in list {
+            if let Some(link) = item.as_str() {
+                links.push(link.to_string());
+            }
+        }
+    }
+}
+
+fn parse_jump_table_line(line: &str) -> Option<(String, u64)> {
+    // New universal format uses a tab so anchors may safely contain ':'.
+    if let Some((id, offset)) = line.split_once('\t') {
+        return Some((id.to_string(), offset.parse::<u64>().ok()?));
+    }
+
+    // Backward-compatible fallback for older "id:offset" jump tables.
+    let (id, offset) = line.rsplit_once(':')?;
+    Some((id.to_string(), offset.parse::<u64>().ok()?))
+}
+
+// --- 2. DATA ACCESS LAYER ---
+
+/**
+ * @function get_address_from
+ * @description Reads a .relay file's jump table and returns the byte offset for an Anchor.
+ */
+pub fn get_address_from<P: AsRef<Path>>(relay_path: P, target_id: &str) -> Option<u64> {
+    let mut file = File::open(relay_path).ok()?;
 
     file.seek(SeekFrom::Start(POINTER_START)).ok()?;
     let mut offset_bytes = [0u8; 8];
@@ -27,101 +84,136 @@ pub fn get_address(target_id: &str) -> Option<u64> {
 
     file.seek(SeekFrom::Start(index_pos)).ok()?;
     let reader = BufReader::new(file);
+
     for line in reader.lines() {
-        let l = line.ok()?;
-        if l.starts_with(target_id) {
-            let parts: Vec<&str> = l.split(':').collect();
-            if parts.len() == 2 {
-                return parts[1].parse::<u64>().ok();
-            }
+        let line = line.ok()?;
+        let (id, offset) = parse_jump_table_line(&line)?;
+        if id == target_id {
+            return Some(offset);
         }
     }
+
     None
 }
 
 /**
- * @function fetch_entry
+ * @function fetch_entry_from
  * @description Pulls raw JSON data from a byte address until it hits the null terminator.
  */
-pub fn fetch_entry(address: u64) -> Value {
-    let mut file = File::open("bacon_standard.relay").expect("Binary not found");
-    file.seek(SeekFrom::Start(address)).unwrap();
+pub fn fetch_entry_from<P: AsRef<Path>>(relay_path: P, address: u64) -> std::io::Result<Value> {
+    let mut file = File::open(relay_path)?;
+    file.seek(SeekFrom::Start(address))?;
+
     let mut buffer = Vec::new();
     let mut byte = [0u8; 1];
-    while file.read(&mut byte).unwrap() > 0 {
+
+    while file.read(&mut byte)? > 0 {
         if byte[0] == TERMINATOR {
             break;
         }
         buffer.push(byte[0]);
     }
-    serde_json::from_slice(&buffer).expect("JSON Parse Error: Data corruption at address")
+
+    serde_json::from_slice(&buffer)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
 
 /**
- * @function get_jump_table
- * @description Parses the binary index into a usable Vector.
- * Allows tools to audit data without manual byte-seeking.
+ * @function get_jump_table_from
+ * @description Parses a .relay file's binary index into a usable vector.
  */
-pub fn get_jump_table() -> Vec<(String, u64)> {
-    let mut file = File::open("bacon_standard.relay").ok().unwrap();
-    file.seek(SeekFrom::Start(POINTER_START)).unwrap();
+pub fn get_jump_table_from<P: AsRef<Path>>(relay_path: P) -> std::io::Result<Vec<(String, u64)>> {
+    let mut file = File::open(relay_path)?;
+    file.seek(SeekFrom::Start(POINTER_START))?;
+
     let mut offset_bytes = [0u8; 8];
-    file.read_exact(&mut offset_bytes).unwrap();
+    file.read_exact(&mut offset_bytes)?;
     let index_pos = u64::from_le_bytes(offset_bytes);
 
-    file.seek(SeekFrom::Start(index_pos)).unwrap();
+    file.seek(SeekFrom::Start(index_pos))?;
     let reader = BufReader::new(file);
-    reader
+
+    Ok(reader
         .lines()
-        .filter_map(|l| {
-            let line = l.ok()?;
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() == 2 {
-                Some((parts[0].to_string(), parts[1].parse::<u64>().ok()?))
-            } else {
-                None
-            }
-        })
-        .collect()
+        .filter_map(|line| parse_jump_table_line(&line.ok()?))
+        .collect())
 }
 
-// --- 2. LOGIC LAYER (The Policies) ---
-
 /**
- * @function verify_integrity
- * @description High-level system health check. Cross-references the index against
- * the physical data blocks. Extracted from original verify.rs logic.
+ * @function verify_integrity_from
+ * @description Cross-references the index against physical data blocks.
  */
-pub fn verify_integrity() -> bool {
-    let entries = get_jump_table();
+pub fn verify_integrity_from<P: AsRef<Path>>(relay_path: P) -> bool {
+    let relay_path = relay_path.as_ref();
+    let entries = match get_jump_table_from(relay_path) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("Could not read jump table: {}", e);
+            return false;
+        }
+    };
+
     let mut failures = 0;
 
     for (id, address) in entries {
-        let data = fetch_entry(address);
-        if data["#id"] != id {
-            println!(
-                "❌ Integrity Failure: #{} corrupted at byte {}",
-                id, address
-            );
-            failures += 1;
+        match fetch_entry_from(relay_path, address) {
+            Ok(data) => {
+                if extract_anchor_id(&data) != Some(id.as_str()) {
+                    println!(
+                        "❌ Integrity Failure: #{} corrupted at byte {}",
+                        id, address
+                    );
+                    failures += 1;
+                }
+            }
+            Err(e) => {
+                println!("❌ Read Failure: #{} at byte {}: {}", id, address, e);
+                failures += 1;
+            }
         }
     }
+
     failures == 0
 }
 
+// --- 3. BACKWARDS-COMPATIBLE DEFAULT WRAPPERS ---
+
+pub fn get_address(target_id: &str) -> Option<u64> {
+    get_address_from(DEFAULT_RELAY_FILE, target_id)
+}
+
+pub fn fetch_entry(address: u64) -> Value {
+    fetch_entry_from(DEFAULT_RELAY_FILE, address).expect("JSON Parse Error or missing binary")
+}
+
+pub fn get_jump_table() -> Vec<(String, u64)> {
+    get_jump_table_from(DEFAULT_RELAY_FILE).unwrap_or_default()
+}
+
+pub fn verify_integrity() -> bool {
+    verify_integrity_from(DEFAULT_RELAY_FILE)
+}
+
+// --- 4. LOGIC LAYER ---
+
 /**
- * @function relay_jump
- * @description The recursive engine. Navigates @ links across the binary.
- * Extracted from reader.rs.
+ * @function relay_jump_from
+ * @description Recursive traversal engine for a chosen .relay file.
  */
-pub fn relay_jump(target_id: &str, visited: &mut HashSet<String>, subject: Option<&str>) {
+pub fn relay_jump_from<P: AsRef<Path>>(
+    relay_path: P,
+    target_id: &str,
+    visited: &mut HashSet<String>,
+    subject: Option<&str>,
+) {
+    let relay_path = relay_path.as_ref();
+
     if visited.contains(target_id) {
         return;
     }
     visited.insert(target_id.to_string());
 
-    // We safely unwrap the Option. If it's None, we log a warning and return.
-    let address = match get_address(target_id) {
+    let address = match get_address_from(relay_path, target_id) {
         Some(addr) => addr,
         None => {
             println!("Warning: Anchor #{} not found in Jump Table.", target_id);
@@ -129,11 +221,24 @@ pub fn relay_jump(target_id: &str, visited: &mut HashSet<String>, subject: Optio
         }
     };
 
-    let data = fetch_entry(address);
+    let data = match fetch_entry_from(relay_path, address) {
+        Ok(data) => data,
+        Err(e) => {
+            println!(
+                "Warning: Could not fetch #{} at byte {}: {}",
+                target_id, address, e
+            );
+            return;
+        }
+    };
+
     if should_display_entry(&data, subject) {
         println!(
             "\n--- [RELAY ENTRY: {}] ---",
-            data["name"].as_str().unwrap_or(target_id)
+            data.get("name")
+                .or_else(|| data.get("title"))
+                .and_then(Value::as_str)
+                .unwrap_or(target_id)
         );
         display_formatted_entry(&data);
     }
@@ -141,32 +246,41 @@ pub fn relay_jump(target_id: &str, visited: &mut HashSet<String>, subject: Optio
     if let Some(obj) = data.as_object() {
         for (key, value) in obj {
             if key.starts_with('@') {
-                process_baton(value, visited, subject);
+                process_baton(relay_path, value, visited, subject);
             }
         }
     }
 }
 
-// --- 3. INTERNAL HELPERS (UI & FILTERING) ---
+pub fn relay_jump(target_id: &str, visited: &mut HashSet<String>, subject: Option<&str>) {
+    relay_jump_from(DEFAULT_RELAY_FILE, target_id, visited, subject)
+}
+
+// --- 5. INTERNAL HELPERS ---
 
 fn should_display_entry(data: &Value, subject: Option<&str>) -> bool {
     if let Some(s) = subject {
         let raw_string = serde_json::to_string(data).unwrap_or_default();
-
-        // Changing || to && ensures that even if it's a movie,
-        // it still MUST contain the subject string.
-        return raw_string.contains(s) && data["^"] == "movies";
+        return raw_string.contains(s);
     }
+
     true
 }
 
-fn process_baton(value: &Value, visited: &mut HashSet<String>, subject: Option<&str>) {
+fn process_baton<P: AsRef<Path>>(
+    relay_path: P,
+    value: &Value,
+    visited: &mut HashSet<String>,
+    subject: Option<&str>,
+) {
+    let relay_path = relay_path.as_ref();
+
     if let Some(next_id) = value.as_str() {
-        relay_jump(next_id, visited, subject);
+        relay_jump_from(relay_path, next_id, visited, subject);
     } else if let Some(list) = value.as_array() {
         for item in list {
             if let Some(next_id) = item.as_str() {
-                relay_jump(next_id, visited, subject);
+                relay_jump_from(relay_path, next_id, visited, subject);
             }
         }
     }
@@ -175,10 +289,12 @@ fn process_baton(value: &Value, visited: &mut HashSet<String>, subject: Option<&
 fn display_formatted_entry(data: &Value) {
     if let Some(obj) = data.as_object() {
         for (key, value) in obj {
-            let prefix = if key.starts_with('^') {
-                "TOPIC"
+            let prefix = if key.starts_with('#') {
+                "ANCHOR"
+            } else if key.starts_with('^') {
+                "PROVENANCE"
             } else if key.starts_with('~') {
-                "METADATA"
+                "ALIAS"
             } else if key.starts_with('@') {
                 "RELAY-LINK"
             } else {
@@ -191,8 +307,7 @@ fn display_formatted_entry(data: &Value) {
 
 /**
  * @function solder_node
- * @description The low-level protocol writer.
- * Encodes a JSON value into the binary format with the null terminator.
+ * @description Encodes a JSON value into the binary format with the null terminator.
  */
 pub fn solder_node(file: &mut File, entry: &Value) -> std::io::Result<u64> {
     let pos = file.stream_position()?;
@@ -202,39 +317,54 @@ pub fn solder_node(file: &mut File, entry: &Value) -> std::io::Result<u64> {
     Ok(pos)
 }
 
-// --- 4. UNIT & INTEGRATION TESTS ---
+// --- 6. UNIT TESTS ---
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // UNIT TEST: Tests filtering logic without disk I/O
     #[test]
-    fn test_metadata_gatekeeper() {
-        let mock_data = serde_json::json!({
-            "name": "Test Node",
-            "~tag": "Drama",
-            "^": "movies"
+    fn test_extract_anchor_id_supports_atlas_hash() {
+        let node = serde_json::json!({ "#": "function:test" });
+        assert_eq!(extract_anchor_id(&node), Some("function:test"));
+    }
+
+    #[test]
+    fn test_extract_anchor_id_supports_relay_hash_id() {
+        let node = serde_json::json!({ "#id": "kevin_bacon" });
+        assert_eq!(extract_anchor_id(&node), Some("kevin_bacon"));
+    }
+
+    #[test]
+    fn test_extract_links_from_node_supports_strings_and_arrays() {
+        let node = serde_json::json!({
+            "#": "function:test",
+            "^": ["project:relaydb", "module:lib"],
+            "@": ["function:a", "function:b"],
+            "@single": "function:c",
+            "~": ["alias"]
         });
-        assert!(should_display_entry(&mock_data, Some("Drama")));
-        assert!(!should_display_entry(&mock_data, Some("Horror")));
+
+        let links = extract_links_from_node(&node);
+
+        assert!(links.contains(&"project:relaydb".to_string()));
+        assert!(links.contains(&"module:lib".to_string()));
+        assert!(links.contains(&"function:a".to_string()));
+        assert!(links.contains(&"function:b".to_string()));
+        assert!(links.contains(&"function:c".to_string()));
     }
 
-    // UNIT TEST: Verifies baton parsing for arrays
     #[test]
-    fn test_baton_list_logic() {
-        let mock_links = serde_json::json!(["link_1", "link_2"]);
-        assert!(mock_links.is_array());
-        assert_eq!(mock_links[0], "link_1");
+    fn test_parse_jump_table_line_supports_tab_separator() {
+        let parsed = parse_jump_table_line("function:fetch_entry\t123").unwrap();
+        assert_eq!(parsed.0, "function:fetch_entry");
+        assert_eq!(parsed.1, 123);
     }
 
-    // INTEGRATION TEST: Verifies disk teleportation
     #[test]
-    fn test_address_lookup() {
-        // We use if let to safely handle the Option during the integration test
-        if let Some(addr) = get_address("kevin_bacon") {
-            let data = fetch_entry(addr);
-            assert_eq!(data["#id"], "kevin_bacon");
-        }
+    fn test_parse_jump_table_line_supports_legacy_colon_separator() {
+        let parsed = parse_jump_table_line("function:fetch_entry:123").unwrap();
+        assert_eq!(parsed.0, "function:fetch_entry");
+        assert_eq!(parsed.1, 123);
     }
 }
