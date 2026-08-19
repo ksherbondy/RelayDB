@@ -1,8 +1,26 @@
+//! RelayDB's shared Rust library.
+//!
+//! There are two layers in this crate:
+//!
+//! * The older functions in this file read and write the provisional
+//!   null-terminated JSON `.relay` layout and power the existing demo CLI.
+//! * `source_model`, `profile`, `compiled_model`, and `reader` form the newer
+//!   logical V1 pipeline that is being aligned with the JavaScript reference.
+//!
+//! Keeping both layers visible is intentional during the port. The logical
+//! modules define behavior first; the physical format can then be replaced
+//! without changing source validation or reader semantics.
+
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+
+pub mod compiled_model;
+pub mod profile;
+pub mod reader;
+pub mod source_model;
 
 // --- PROTOCOL CONSTANTS ---
 // Centralized so the Compiler and Reader always speak the same language.

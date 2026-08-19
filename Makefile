@@ -31,6 +31,7 @@ SELF_DOC_OUTPUT  ?= $(BUILDS)/relaydb-v1-self-docs.relay
 
 INPUT            ?= $(MEMORY_BASE)
 OUTPUT           ?= $(SELF_DOC_OUTPUT)
+LEGACY_PROVENANCE ?= 1
 ANCHOR           ?= project:relaydb
 FILTER           ?=
 
@@ -38,7 +39,6 @@ VERSION          ?= v1.2.0
 RELEASE_DIR      ?= releases
 RELEASE_NAME     ?= relaydb-$(VERSION)
 
-NODE             ?= node
 OPEN             ?= open
 
 # --- Phony Targets -------------------------------------------------------------
@@ -49,7 +49,6 @@ OPEN             ?= open
 	init-dirs \
 	test fmt fmt-check clippy \
 	build self-docs strict verify jump jump-project jump-compiler jump-self-doc \
-	js-smoke \
 	audit graph graph-png size checksum inspect \
 	validate-memory memory-summary duplicates missing orphans external cycles memory-audit \
 	merge-memory patch-next \
@@ -64,16 +63,16 @@ all: test build verify
 	@echo "✅ RelayDB core pipeline passed."
 	@echo "📦 Relay artifact: $(OUTPUT)"
 
-stable: clean init-dirs test self-docs verify js-smoke memory-audit graph-png checksum
+stable: clean init-dirs test self-docs verify memory-audit graph-png checksum
 	@echo ""
 	@echo "✅ RelayDB stable foundation check complete."
 	@echo "📦 Relay artifact: $(OUTPUT)"
 	@echo "🧠 Memory source: $(INPUT)"
 	@echo "📁 Build artifacts: $(BUILDS)"
 
-demo: self-docs verify jump-project js-smoke
+demo: self-docs verify jump-project inspect
 	@echo ""
-	@echo "🎥 Demo pipeline complete: JSONL -> .relay -> verify -> jump -> JS reader"
+	@echo "🎥 Demo pipeline complete: JSONL -> .relay -> verify -> jump -> Rust reader"
 
 init-dirs:
 	@mkdir -p $(BUILDS)
@@ -115,12 +114,14 @@ build: init-dirs
 	@cd $(COMPILER_DIR) && cargo run --bin compiler --quiet -- \
 		--input ../$(INPUT) \
 		--output ../$(OUTPUT) \
-		--builds ../$(BUILDS)
+		--builds ../$(BUILDS) \
+		$(if $(LEGACY_PROVENANCE),--allow-legacy-provenance,)
 
 self-docs:
 	@$(MAKE) build \
 		INPUT=$(MEMORY_BASE) \
-		OUTPUT=$(SELF_DOC_OUTPUT)
+		OUTPUT=$(SELF_DOC_OUTPUT) \
+		LEGACY_PROVENANCE=1
 
 strict: init-dirs
 	@echo "--- [Build] Strict acyclic compile ---"
@@ -128,7 +129,8 @@ strict: init-dirs
 		--input ../$(INPUT) \
 		--output ../$(OUTPUT) \
 		--builds ../$(BUILDS) \
-		--strict-acyclic
+		--strict-acyclic \
+		$(if $(LEGACY_PROVENANCE),--allow-legacy-provenance,)
 
 verify:
 	@echo "--- [Verify] Performing physical .relay integrity check ---"
@@ -161,14 +163,6 @@ jump-self-doc:
 	@$(MAKE) jump OUTPUT=$(OUTPUT) ANCHOR=concept:self-documentation-loop
 
 # ==============================================================================
-# JavaScript Reader Smoke Test
-# ==============================================================================
-
-js-smoke:
-	@echo "--- [JS] Running RelayDB JavaScript reader smoke test ---"
-	@$(NODE) examples/basic-js/test.js $(OUTPUT)
-
-# ==============================================================================
 # Build Artifacts / Visuals / Inspection
 # ==============================================================================
 
@@ -195,8 +189,8 @@ checksum:
 	@shasum -a 256 $(OUTPUT)
 
 inspect: size checksum
-	@echo "--- [Inspect] First 20 anchors via JS reader ---"
-	@$(NODE) -e "import fs from 'node:fs'; import RelayDB from './packages/relaydb-js/src/index.js'; const b=fs.readFileSync('$(OUTPUT)'); const ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength); const db=RelayDB.fromBytes(ab); console.log(db.anchors().slice(0,20));"
+	@echo "--- [Inspect] First 20 anchors via Rust reader ---"
+	@cd $(COMPILER_DIR) && cargo run --bin relay --quiet -- anchors --file ../$(OUTPUT) --limit 20
 
 # ==============================================================================
 # Rust-Backed Memory / Graph Health Audits
@@ -335,15 +329,15 @@ help:
 	@echo ""
 	@echo "Primary:"
 	@echo "  make all              test -> build -> verify"
-	@echo "  make stable           clean -> test -> self-docs -> verify -> js-smoke -> memory-audit -> graph-png -> checksum"
-	@echo "  make demo             self-docs -> verify -> jump-project -> js-smoke"
+	@echo "  make stable           clean -> test -> self-docs -> verify -> memory-audit -> graph-png -> checksum"
+	@echo "  make demo             self-docs -> verify -> jump-project -> inspect"
 	@echo ""
 	@echo "Build / Run:"
 	@echo "  make build            Compile INPUT into OUTPUT"
 	@echo "  make self-docs        Compile relaydb_v1_self_documentation.jsonl"
 	@echo "  make verify           Verify physical .relay integrity"
 	@echo "  make jump             Jump to ANCHOR in OUTPUT"
-	@echo "  make js-smoke         Test JS reader against OUTPUT"
+	@echo "  make inspect          List the first 20 anchors with the Rust reader"
 	@echo ""
 	@echo "Memory Audits:"
 	@echo "  make validate-memory  Validate JSON/JSONL and anchors"

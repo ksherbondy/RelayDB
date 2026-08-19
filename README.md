@@ -28,7 +28,7 @@ RelayDB is **not** a database replacement. It is a **compiled read layer** for d
 
 ## Current status
 
-RelayDB v1 is a working proof of concept.
+RelayDB v1 is a working Rust compiler and read-only runtime. The archived JavaScript implementation is retained only as historical compatibility evidence.
 
 The current foundation supports:
 
@@ -40,6 +40,10 @@ The current foundation supports:
 - generated Markdown audit reports
 - generated Graphviz DOT topology files
 - self-documentation through compiled RelayDB memory
+- V1 identity, collection, relationship, cardinality, ambiguity, and numeric validation
+- logical field profiling and relationship index compilation
+- collection-aware Rust reads, queries, pagination, projection, and depth-limited hydration
+- compatibility tests against the archived V1 fixture corpus
 
 The current proof loop is:
 
@@ -486,6 +490,93 @@ Longer term, the Makefile will become RelayDB’s audit and compliance interface
 
 ## Current implementation notes
 
+## Learn the implementation
+
+The easiest way to understand RelayDB is to follow one record through the
+pipeline rather than starting with the binary format:
+
+```text
+JSON / JSONL bytes
+  |
+  v
+compiler.rs: ingest files into serde_json::Value
+  |
+  v
+source_model.rs: validate identity, collection, numbers, and @ links
+  |
+  v
+profile.rs: measure fields for future compact encoding decisions
+  |
+  v
+compiled_model.rs: map public relationship IDs to integer record positions
+  |
+  +----------------------+
+  |                      |
+  v                      v
+legacy .relay writer      reader.rs runtime API
+  |                      |
+  +-----------> get / query / hydrate
+```
+
+### 1. Source records
+
+Every source object needs exactly one non-empty `#` or `#id` and a non-empty
+`^` collection string. Ordinary fields are preserved as payload. `@field`
+values are relationship references; `~field` values are searchable or indexed
+payload by convention.
+
+The source validator deliberately runs in two passes. The first pass checks
+each record and builds lookup tables. The second pass resolves relationships
+after every input file is known. This is what makes a movie in one JSON file
+able to reference an actor in another file.
+
+### 2. Profiling
+
+The profiler does not rewrite records. It counts field presence, explicit nulls,
+scalar values, arrays, and numeric ranges per collection. A missing field and a
+present `null` are different states, so both `record_count` and
+`present_count` matter. `BTreeMap` keeps profile output deterministic, which
+makes generated metadata and tests stable.
+
+### 3. Logical compilation
+
+The logical compiler keeps developer IDs in the public record while creating
+integer positions for relationships. Integer positions are cheaper to follow
+than repeatedly comparing strings, but they are an implementation detail. A
+relationship remains `Null`, `Scalar`, or `Array`, so cardinality is not lost.
+
+This layer is intentionally separate from the physical writer. It lets the
+project improve the `.relay` layout later without changing the source contract
+or runtime semantics.
+
+### 4. Runtime reads
+
+`reader.rs` opens the current artifact, validates the header pointer, parses the
+record region, and exposes collection-aware lookup. Unqualified duplicate IDs
+produce an ambiguity error instead of silently returning whichever record was
+encountered first.
+
+Queries filter before pagination. Projections always retain identity and
+collection metadata. Hydration follows `@` links only to the requested depth
+and keeps a path-local visited set so cycles terminate.
+
+### 5. How to extend the system
+
+When adding a feature, keep the ownership boundaries intact:
+
+1. Add or clarify a source rule in `source_model.rs` and a fixture test.
+2. Add statistics in `profile.rs` only if encoding decisions need them.
+3. Add runtime relationship structures in `compiled_model.rs`.
+4. Add reader behavior in `reader.rs`, including a focused test.
+5. Change the physical artifact only after logical behavior is verified.
+6. Run `cargo fmt -- --check`, `cargo clippy -- -D warnings`, `cargo test`, and
+   `make all` before publishing.
+
+The archived JavaScript material under `deprecated/javascript-reference/` is
+historical compatibility evidence. The Rust modules are the production
+compiler and reader. Compare behavior and fixtures, not incidental
+implementation details or provisional byte layouts.
+
 The current working implementation:
 
 - compiles `.json` and `.jsonl` source into a single `.relay` artifact
@@ -507,15 +598,16 @@ This means runtime retrieval is based on the compiled artifact, not on reopening
 
 ## Current limitations
 
-RelayDB v1 is intentionally still a proof-of-concept foundation.
+The logical V1 behavior is implemented. The physical `.relay` bytes remain the provisional legacy layout described in `deprecated/javascript-reference/js_ref_code/REFERENCE_FORMAT_V1.md`; final byte-format hardening is intentionally a later milestone.
 
 Known limitations:
 
 - Anchor lookup currently scans the text jump table before seeking to the byte offset.
 - The byte seek is direct after anchor resolution, but lookup should not be described as strict O(1) yet.
 - Graph cycles are allowed by default and reported as warnings unless strict mode is enabled.
+- The current CLI reader binary is still a legacy traversal demo; applications should use the `relay_compiler::reader::RelayDb` library API.
 - The audit suite is not complete yet.
-- Missing-anchor, duplicate-anchor, orphan-node, and external-reference checks are planned hardening work.
+- Missing-anchor, duplicate-anchor, orphan-node, and external-reference checks are separate audit concerns from V1 source validation.
 - The docs viewer has not been built yet.
 
 These limitations are being kept explicit to avoid overstating the current implementation.

@@ -1,0 +1,2 @@
+{"#id":"a","^":"nodes","@link":"b"}
+{"#id":"b","^":"nodes","@link":"a"}

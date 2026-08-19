@@ -1,6 +1,9 @@
 use clap::Parser;
 use relay_compiler::{
-    HEADER_SIZE, POINTER_START, extract_anchor_id, extract_links_from_node, solder_node,
+    HEADER_SIZE, POINTER_START,
+    compiled_model::{CompiledModel, compile_model},
+    extract_anchor_id, extract_links_from_node, solder_node,
+    source_model::validate_records,
 };
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -31,13 +34,21 @@ struct Args {
     /// Default is false because ATLAS/project-memory graphs commonly contain valid semantic cycles.
     #[arg(long, default_value_t = false)]
     strict_acyclic: bool,
+
+    /// Normalize legacy ATLAS-style `^` arrays to the record's `type` collection.
+    #[arg(long, default_value_t = false)]
+    allow_legacy_provenance: bool,
 }
 
 // --- Core Data Structures ---
 
 struct GraphAnalysis {
+    // Each field is a different view of the same source: raw records for the
+    // legacy writer, a graph for cycle reporting, and the logical V1 model for
+    // runtime-oriented compilation.
     nodes: Vec<Value>,
     adj_list: HashMap<String, Vec<String>>,
+    compiled_model: CompiledModel,
 }
 
 /**
@@ -52,13 +63,19 @@ fn main() -> Result<()> {
     println!("Input:  {}", args.input.display());
     println!("Output: {}", args.output.display());
 
-    // 1. PHASE: Ingestion
-    let analysis = ingest_data(&args.input)?;
+    // 1. INGESTION: read every source file before validating relationships.
+    // A movie may reference an actor stored in another JSON file.
+    let analysis = ingest_data(&args.input, args.allow_legacy_provenance)?;
 
-    // 2. PHASE: Validation
+    // 2. VALIDATION: source rules and relationship indexes are checked before
+    // any artifact is published.
     println!(
         "Validating topology across {} nodes...",
         analysis.nodes.len()
+    );
+    println!(
+        "Compiled logical model across {} records.",
+        analysis.compiled_model.records.len()
     );
 
     match verify_no_cycles(&analysis.adj_list) {
@@ -77,11 +94,12 @@ fn main() -> Result<()> {
         }
     }
 
-    // 3. PHASE: Artifact Generation
+    // 3. AUDIT ARTIFACTS: Markdown and DOT explain the build but are not part
+    // of runtime lookup.
     let dtg = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
     generate_artifacts(&analysis, &dtg, &args.builds, &args.output)?;
 
-    // 4. PHASE: Binary Bake
+    // 4. BINARY BAKE: serialize records and write the jump-table pointer.
     bake_binary(&analysis, &args.output)?;
 
     Ok(())
@@ -89,18 +107,24 @@ fn main() -> Result<()> {
 
 // --- Ingestion ---
 
-fn ingest_data(input_path: &Path) -> Result<GraphAnalysis> {
+fn ingest_data(input_path: &Path, allow_legacy_provenance: bool) -> Result<GraphAnalysis> {
     let mut analysis = GraphAnalysis {
         nodes: Vec::new(),
         adj_list: HashMap::new(),
+        compiled_model: CompiledModel {
+            records: Vec::new(),
+            by_collection_id: HashMap::new(),
+        },
     };
 
+    // Sorting in `collect_input_files` makes directory builds deterministic.
     let files = collect_input_files(input_path)?;
 
     for path in files {
         let mut nodes = read_nodes_from_file(&path)?;
 
         for node in nodes.drain(..) {
+            let node = normalize_legacy_provenance(node, allow_legacy_provenance)?;
             let id = extract_anchor_id(&node).unwrap_or("unknown").to_string();
 
             let links = extract_links_from_node(&node);
@@ -110,7 +134,40 @@ fn ingest_data(input_path: &Path) -> Result<GraphAnalysis> {
         }
     }
 
+    // Only after global validation succeeds do we construct integer indexes.
+    let source_model = validate_records(&analysis.nodes).map_err(|diagnostics| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            diagnostics
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("; "),
+        )
+    })?;
+    analysis.compiled_model = compile_model(&source_model)
+        .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidData, message))?;
+
     Ok(analysis)
+}
+
+fn normalize_legacy_provenance(mut node: Value, enabled: bool) -> Result<Value> {
+    // Strict V1 uses `^` as a collection string. Existing project-memory files
+    // use ATLAS-style `^` arrays plus `type`, so compatibility is opt-in here.
+    if !enabled {
+        return Ok(node);
+    }
+    let Some(object) = node.as_object_mut() else {
+        return Ok(node);
+    };
+    let needs_collection = object.get("^").is_none_or(|value| !value.is_string());
+    if needs_collection {
+        let Some(collection) = object.get("type").and_then(Value::as_str) else {
+            return Ok(node);
+        };
+        object.insert("^".into(), Value::String(collection.into()));
+    }
+    Ok(node)
 }
 
 fn collect_input_files(input_path: &Path) -> Result<Vec<PathBuf>> {
@@ -259,7 +316,7 @@ fn generate_artifacts(
 
     writeln!(md_file, "## High-Frequency Anchors / Hubs")?;
     let mut hubs: Vec<_> = hub_counts.into_iter().collect();
-    hubs.sort_by(|a, b| b.1.cmp(&a.1));
+    hubs.sort_by_key(|hub| std::cmp::Reverse(hub.1));
 
     if hubs.is_empty() {
         writeln!(md_file, "- No relationships found.")?;
@@ -313,7 +370,11 @@ fn generate_dot_file(
 fn bake_binary(analysis: &GraphAnalysis, output_path: &Path) -> Result<()> {
     println!("Validation complete. Soldering binary...");
 
-    let mut file = fs::File::create(output_path)?;
+    // Build beside the destination and rename only after the complete file is
+    // synced. A failed compile cannot leave a truncated artifact at the path
+    // consumers expect.
+    let temporary_path = output_path.with_extension(format!("relay.tmp-{}", std::process::id()));
+    let mut file = fs::File::create(&temporary_path)?;
 
     // Step A: Reserve header space
     file.write_all(&vec![0u8; HEADER_SIZE as usize])?;
@@ -342,6 +403,9 @@ fn bake_binary(analysis: &GraphAnalysis, output_path: &Path) -> Result<()> {
     // Step D: Write index pointer into header
     file.seek(SeekFrom::Start(POINTER_START))?;
     file.write_all(&index_pos.to_le_bytes())?;
+    file.sync_all()?;
+    drop(file);
+    fs::rename(&temporary_path, output_path)?;
 
     println!("SUCCESS: '{}' is soldered.", output_path.display());
     Ok(())

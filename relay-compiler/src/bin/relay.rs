@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
-use relay_compiler::{audit_memory_from, relay_jump_from, verify_integrity_from};
+use relay_compiler::{
+    audit_memory_from, extract_anchor_id, reader::RelayDb, relay_jump_from, verify_integrity_from,
+};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -33,6 +35,17 @@ enum Commands {
         /// The .relay file to verify
         #[arg(short, long, default_value = "output.relay")]
         file: PathBuf,
+    },
+
+    /// List public record IDs from a compiled artifact.
+    Anchors {
+        /// The .relay file to inspect
+        #[arg(short, long, default_value = "output.relay")]
+        file: PathBuf,
+
+        /// Maximum number of IDs to print
+        #[arg(short, long, default_value_t = 20)]
+        limit: usize,
     },
 
     /// Audit RelayDB JSON/JSONL source memory before compile
@@ -82,6 +95,24 @@ fn main() {
                 std::process::exit(1);
             }
         }
+
+        Commands::Anchors { file, limit } => match RelayDb::open(file) {
+            Ok(db) => {
+                println!("--- RELAY-ANCHORS: {} ---", file.display());
+                for id in db
+                    .records()
+                    .iter()
+                    .filter_map(extract_anchor_id)
+                    .take(*limit)
+                {
+                    println!("{}", id);
+                }
+            }
+            Err(error) => {
+                eprintln!("CRITICAL: Could not inspect artifact: {}", error);
+                std::process::exit(1);
+            }
+        },
 
         Commands::AuditMemory { input, mode } => {
             println!(
